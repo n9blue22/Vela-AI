@@ -1,0 +1,89 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: 196 35% 96%;
+  --color-panel: 0 0% 100%;
+  --color-panel-alt: 188 28% 93%;
+  --color-line: 194 20% 78%;
+  --color-text: 204 30% 14%;
+  --color-subtext: 201 15% 35%;
+  --color-primary: 169 67% 36%;
+  --color-primary-strong: 169 72% 29%;
+  --color-success: 152 66% 30%;
+  --color-danger: 6 78% 50%;
+  --color-warning: 33 94% 46%;
+}
+
+:root[data-theme="dark"] {
+  --color-bg: 201 23% 10%;
+  --color-panel: 202 21% 15%;
+  --color-panel-alt: 203 19% 19%;
+  --color-line: 201 16% 30%;
+  --color-text: 190 18% 92%;
+  --color-subtext: 193 12% 70%;
+  --color-primary: 168 72% 45%;
+  --color-primary-strong: 169 80% 37%;
+  --color-success: 151 70% 41%;
+  --color-danger: 6 82% 58%;
+  --color-warning: 33 94% 53%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at 15% 0%, hsl(171 68% 90%), transparent 45%),
+    radial-gradient(circle at 100% 100%, hsl(36 79% 88%), transparent 33%),
+    radial-gradient(circle at 80% 35%, hsl(197 48% 89%), transparent 40%),
+    hsl(var(--color-bg));
+  color: hsl(var(--color-text));
+  font-family: "Manrope", "Segoe UI", "Helvetica Neue", sans-serif;
+  letter-spacing: 0;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+:root[data-theme="dark"] body {
+  background: radial-gradient(circle at 15% 0%, hsl(170 52% 21%), transparent 43%),
+    radial-gradient(circle at 100% 100%, hsl(27 52% 20%), transparent 34%),
+    radial-gradient(circle at 80% 35%, hsl(197 45% 16%), transparent 40%),
+    hsl(var(--color-bg));
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.hero-spa-bg {
+  background-image: linear-gradient(
+      100deg,
+      rgba(7, 36, 41, 0.72) 8%,
+      rgba(13, 60, 52, 0.58) 35%,
+      rgba(17, 37, 44, 0.45) 60%,
+      rgba(21, 40, 27, 0.62) 100%
+    ),
+    url("https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=1800&q=80");
+  background-size: cover;
+  background-position: center;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.45s ease both;
+}
