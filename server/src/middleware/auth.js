@@ -4,7 +4,7 @@ import { verifyAccessToken } from "../utils/token.js";
 const AUTH_USER_CACHE_TTL_MS = 15 * 1000;
 const authUserCache = new Map();
 
-function getCachedUser(userId) {
+export function getCachedAuthUser(userId) {
   const cached = authUserCache.get(userId);
   if (!cached) return null;
   if (cached.expiresAt < Date.now()) {
@@ -14,11 +14,17 @@ function getCachedUser(userId) {
   return cached.user;
 }
 
-function setCachedUser(userId, user) {
-  authUserCache.set(userId, {
+export function cacheAuthUser(user) {
+  if (!user?.id) return;
+  authUserCache.set(user.id, {
     user,
     expiresAt: Date.now() + AUTH_USER_CACHE_TTL_MS
   });
+}
+
+export function invalidateAuthUserCache(userId) {
+  if (!userId) return;
+  authUserCache.delete(userId);
 }
 
 setInterval(() => {
@@ -39,12 +45,12 @@ export async function requireAuth(req, res, next) {
     }
 
     const payload = verifyAccessToken(token);
-    let user = getCachedUser(payload.userId);
+    let user = getCachedAuthUser(payload.userId);
 
     if (!user) {
       user = await dbService.getUserById(payload.userId);
       if (user) {
-        setCachedUser(payload.userId, user);
+        cacheAuthUser(user);
       }
     }
 

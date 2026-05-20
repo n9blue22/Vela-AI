@@ -4,7 +4,7 @@ export type Role = "customer" | "admin";
 export type Plan = "mien_phi" | "tiet_kiem" | "cao_cap";
 
 export type Channel = "facebook" | "tiktok" | "zalo" | "google";
-export type Tone = "friendly" | "professional" | "playful";
+export type Tone = "friendly" | "premium" | "storytelling" | "playful" | "expert";
 export type Language = "vi" | "en" | "bilingual";
 export type LeadStatus = "new" | "contacted" | "negotiating" | "won" | "lost";
 
@@ -33,6 +33,30 @@ export interface ContentResult {
   body: string;
   cta: string;
   replyTemplate: string;
+  hashtags?: string[];
+}
+
+export interface ContentHistoryItem {
+  _id: string;
+  id: string;
+  ownerUserId: string;
+  channel: string;
+  goal: string;
+  audience: string;
+  productOrService: string;
+  tone: string;
+  language: string;
+  specialNote: string;
+  headline: string;
+  body: string;
+  cta: string;
+  replyTemplate: string;
+  hashtags?: string[];
+  provider: string;
+  model: string;
+  isFallback: boolean;
+  fallbackReason: string;
+  createdAt: string;
 }
 
 export interface Lead {

@@ -17,19 +17,29 @@ export async function apiRequest<T>(path: string, config: RequestConfig = {}): P
   const controller = new AbortController();
   const timeoutMs = Number(config.timeoutMs) > 0 ? Number(config.timeoutMs) : DEFAULT_TIMEOUT_MS;
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  const requestUrl = `${API_BASE_URL}${normalizePath(path)}`;
+  const hasBody = config.body !== undefined && config.body !== null;
 
   try {
-    const response = await fetch(`${API_BASE_URL}${normalizePath(path)}`, {
+    const response = await fetch(requestUrl, {
       method: config.method ?? "GET",
       headers: {
-        "Content-Type": "application/json",
+        ...(hasBody ? { "Content-Type": "application/json" } : {}),
         ...(config.token ? { Authorization: `Bearer ${config.token}` } : {})
       },
-      body: config.body ? JSON.stringify(config.body) : undefined,
+      body: hasBody ? JSON.stringify(config.body) : undefined,
       signal: controller.signal
     });
 
-    const data = await response.json().catch(() => ({}));
+    const rawText = await response.text();
+    let data: unknown = {};
+    if (rawText) {
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        data = { message: rawText };
+      }
+    }
     if (!response.ok) {
       const message = (data as { message?: string }).message || `API lỗi ${response.status}`;
       throw new Error(message);
@@ -44,7 +54,13 @@ export async function apiRequest<T>(path: string, config: RequestConfig = {}): P
     }
 
     if (error instanceof TypeError && String(error.message).toLowerCase().includes("failed to fetch")) {
-      throw new Error("Không kết nối được máy chủ API (127.0.0.1:5050). Hãy kiểm tra backend đang chạy.");
+      let apiHost = "127.0.0.1:5050";
+      try {
+        apiHost = new URL(API_BASE_URL).host || apiHost;
+      } catch {
+        // keep default host hint
+      }
+      throw new Error(`Không kết nối được máy chủ API (${apiHost}). Hãy kiểm tra backend đang chạy.`);
     }
     throw error;
   } finally {

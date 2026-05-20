@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    "dev": "concurrently -n server,client -c green,cyan \"nodemon server/index.js\" \"vite --host 127.0.0.1 --port 5173\"",
     "dev:client": "vite --host 127.0.0.1 --port 5173",
     "dev:server": "nodemon server/index.js",
     "build": "tsc -b && vite build",

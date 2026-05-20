@@ -7,12 +7,13 @@ export function getSupabaseClient() {
   if (!env.SUPABASE_URL) {
     throw new Error("SUPABASE_URL is required.");
   }
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required.");
+  const apiKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
+  if (!apiKey) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY is required.");
   }
 
   if (!supabaseClient) {
-    supabaseClient = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    supabaseClient = createClient(env.SUPABASE_URL, apiKey, {
       auth: {
         persistSession: false
       }
@@ -21,4 +22,3 @@ export function getSupabaseClient() {
 
   return supabaseClient;
 }
-

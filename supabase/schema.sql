@@ -45,6 +45,59 @@ create table if not exists public.tasks (
 );
 
 create index if not exists tasks_owner_user_id_idx on public.tasks(owner_user_id);
+create index if not exists tasks_owner_status_created_at_idx
+on public.tasks(owner_user_id, status, created_at desc);
+create index if not exists tasks_type_status_created_at_idx
+on public.tasks(type, status, created_at desc);
+
+create table if not exists public.content_generations (
+  id uuid primary key default gen_random_uuid(),
+  owner_user_id uuid not null references public.users(id) on delete cascade,
+  channel text not null default '',
+  goal text not null default '',
+  audience text not null default '',
+  product_or_service text not null default '',
+  tone text not null default '',
+  language text not null default '',
+  special_note text not null default '',
+  headline text not null,
+  body text not null,
+  cta text not null,
+  reply_template text not null,
+  hashtags text[] not null default '{}'::text[],
+  provider text not null default 'ai',
+  model text not null default '',
+  is_fallback boolean not null default false,
+  fallback_reason text not null default '',
+  created_at timestamptz not null default now()
+);
+
+alter table public.content_generations
+add column if not exists hashtags text[] not null default '{}'::text[];
+
+create index if not exists content_generations_owner_user_id_created_at_idx
+on public.content_generations(owner_user_id, created_at desc);
+
+create table if not exists public.integration_webhook_events (
+  id uuid primary key default gen_random_uuid(),
+  provider text not null default 'unknown',
+  event_type text not null default 'unknown',
+  signature text not null default '',
+  payload jsonb not null default '{}'::jsonb,
+  received_at timestamptz not null default now()
+);
+
+create index if not exists integration_webhook_events_provider_received_at_idx
+on public.integration_webhook_events(provider, received_at desc);
+
+create index if not exists users_role_created_at_idx
+on public.users(role, created_at desc);
+
+alter table public.users enable row level security;
+alter table public.leads enable row level security;
+alter table public.tasks enable row level security;
+alter table public.content_generations enable row level security;
+alter table public.integration_webhook_events enable row level security;
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -73,4 +126,3 @@ create trigger set_tasks_updated_at
 before update on public.tasks
 for each row
 execute procedure public.set_updated_at();
-

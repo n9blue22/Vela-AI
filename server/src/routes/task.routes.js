@@ -91,6 +91,10 @@ router.patch("/:taskId", requireAuth, async (req, res) => {
       patch.dueAt = dueAt;
     }
 
+    if (Object.keys(patch).length === 0) {
+      return res.status(400).json({ message: "Không có dữ liệu hợp lệ để cập nhật task." });
+    }
+
     const task = await dbService.updateTaskByOwner(taskId, req.user.id, patch);
     if (!task) {
       return res.status(404).json({ message: "Không tìm thấy công việc." });

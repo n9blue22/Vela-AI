@@ -5,7 +5,9 @@ import { env } from "./config/env.js";
 import { createTokenBucketLimiter } from "./middleware/rate-limit.js";
 import { adminRouter } from "./routes/admin.routes.js";
 import { authRouter } from "./routes/auth.routes.js";
+import { billingRouter } from "./routes/billing.routes.js";
 import { contentRouter } from "./routes/content.routes.js";
+import { integrationRouter } from "./routes/integration.routes.js";
 import { leadRouter } from "./routes/lead.routes.js";
 import { taskRouter } from "./routes/task.routes.js";
 
@@ -49,6 +51,9 @@ app.use(
   })
 );
 
+// Integration webhooks use raw body signature verification, so mount before express.json.
+app.use("/api/integrations", integrationRouter);
+
 app.use(express.json({ limit: "1mb" }));
 app.use(
   createTokenBucketLimiter({
@@ -65,6 +70,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/billing", billingRouter);
 app.use("/api/content", contentRouter);
 app.use("/api/leads", leadRouter);
 app.use("/api/tasks", taskRouter);

@@ -1,4 +1,4 @@
-import { AuthUser, Lead, TaskItem } from "../types";
+import { AuthUser, ContentHistoryItem, Lead, TaskItem } from "../types";
 import { apiRequest } from "./http.service";
 
 interface GenerateContentPayload {
@@ -16,6 +16,45 @@ interface GenerateContentPayload {
     language: string;
     specialNote: string;
   };
+}
+
+export interface AutoPostPresignFile {
+  fileName: string;
+  contentType: string;
+  fileSize: number;
+}
+
+export interface AutoPostPresignItem {
+  fileName: string;
+  contentType: string;
+  fileSize: number;
+  uploadUrl: string;
+  publicUrl: string;
+  mediaType: "image" | "video" | "gif" | "document";
+  key: string;
+}
+
+export interface AutoPostPublishResult {
+  platform: string;
+  ok: boolean;
+  message?: string;
+  status?: string;
+  postId?: string;
+  platformPostId?: string;
+  platformPostUrl?: string;
+  publishedAt?: string | null;
+  scheduledFor?: string | null;
+  accountId?: string;
+  code?: string;
+}
+
+export interface AutoPostPublishResponse {
+  status: "published" | "scheduled" | "partial";
+  mode: "now" | "schedule";
+  message: string;
+  publishedCount: number;
+  failedCount: number;
+  results: AutoPostPublishResult[];
 }
 
 export const appService = {
@@ -79,6 +118,7 @@ export const appService = {
         body: string;
         cta: string;
         replyTemplate: string;
+        hashtags?: string[];
       };
       quota: {
         used: number;
@@ -86,10 +126,12 @@ export const appService = {
         remaining: number;
       };
       meta?: {
-        provider: "gemini" | "fallback_template";
+        provider: "groq" | "cloudflare" | "openrouter" | "gemini" | "fallback_template" | "ai";
+        model?: string;
         fallback: boolean;
         reason?: string;
         notice?: string;
+        providersTried?: string[];
       };
     }>("/content/generate", {
       method: "POST",
@@ -105,6 +147,52 @@ export const appService = {
       remaining: number;
     }>("/content/quota", {
       token
+    });
+  },
+  async getContentHistory(token: string, limit = 20) {
+    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(100, Math.floor(limit))) : 20;
+    return apiRequest<{ items: ContentHistoryItem[] }>(`/content/history?limit=${safeLimit}`, {
+      token
+    });
+  },
+  async submitUpgradeRequest(
+    token: string,
+    payload: { plan: string; amountVnd: number; transferContent: string; note?: string }
+  ) {
+    return apiRequest<{ message: string; task: TaskItem; assignedAdmin: { id: string; name: string; email: string } }>(
+      "/billing/upgrade-requests",
+      {
+        method: "POST",
+        token,
+        body: payload
+      }
+    );
+  },
+  async createAutoPostPresign(token: string, files: AutoPostPresignFile[]) {
+    return apiRequest<{ items: AutoPostPresignItem[] }>("/integrations/zernio/media/presign", {
+      method: "POST",
+      token,
+      body: { files },
+      timeoutMs: 30000
+    });
+  },
+  async publishAutoPost(
+    token: string,
+    payload: {
+      caption: string;
+      platforms: Array<"facebook" | "instagram">;
+      mediaItems: Array<{ type: "image" | "video" | "gif" | "document"; url: string }>;
+      mode: "now" | "schedule";
+      scheduleAt?: string;
+      timezone?: string;
+      antiSpamJitter?: boolean;
+    }
+  ) {
+    return apiRequest<AutoPostPublishResponse>("/integrations/zernio/publish", {
+      method: "POST",
+      token,
+      body: payload,
+      timeoutMs: 40000
     });
   },
   async getAdminOverview(token: string) {

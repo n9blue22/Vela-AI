@@ -1,7 +1,7 @@
 import express from "express";
 import { env } from "../config/env.js";
 import { getPlanLimit } from "../constants/plan.js";
-import { requireAuth } from "../middleware/auth.js";
+import { cacheAuthUser, requireAuth } from "../middleware/auth.js";
 import { createTokenBucketLimiter } from "../middleware/rate-limit.js";
 import { dbService } from "../services/db.service.js";
 import { generateFallbackSpaContent } from "../services/fallback-content.service.js";
@@ -16,7 +16,7 @@ const contentLimiter = createTokenBucketLimiter({
   capacity: env.RATE_LIMIT_CONTENT_CAPACITY,
   refillPerSecond: env.RATE_LIMIT_CONTENT_REFILL_PER_SEC,
   blockDurationMs: env.RATE_LIMIT_CONTENT_BLOCK_MS,
-  message: "Bạn đang tạo nội dung quá nhanh. Vui lòng chờ một chút rồi thử lại."
+  message: "Ban dang tao noi dung qua nhanh. Vui long doi mot chut roi thu lai."
 });
 
 function sanitizeGeneratePayload(rawBody) {
@@ -35,7 +35,18 @@ function sanitizeGeneratePayload(rawBody) {
   const language = normalizeOptionalText(input.language, { max: 20 });
   const specialNote = normalizeOptionalText(input.specialNote, { max: 300 });
 
-  if (!businessName || !industry || keyMessage === null || !channel || !goal || !audience || !productOrService || tone === null || language === null || specialNote === null) {
+  if (
+    !businessName ||
+    !industry ||
+    keyMessage === null ||
+    !channel ||
+    !goal ||
+    !audience ||
+    !productOrService ||
+    tone === null ||
+    language === null ||
+    specialNote === null
+  ) {
     return null;
   }
 
@@ -57,6 +68,55 @@ function sanitizeGeneratePayload(rawBody) {
   };
 }
 
+async function saveGenerationHistory({
+  userId,
+  payload,
+  content,
+  provider,
+  model = "",
+  isFallback = false,
+  fallbackReason = ""
+}) {
+  try {
+    await dbService.createContentGeneration({
+      ownerUserId: userId,
+      channel: payload?.input?.channel || "",
+      goal: payload?.input?.goal || "",
+      audience: payload?.input?.audience || "",
+      productOrService: payload?.input?.productOrService || "",
+      tone: payload?.input?.tone || "",
+      language: payload?.input?.language || "",
+      specialNote: payload?.input?.specialNote || "",
+      headline: content?.headline || "",
+      body: content?.body || "",
+      cta: content?.cta || "",
+      replyTemplate: content?.replyTemplate || "",
+      hashtags: Array.isArray(content?.hashtags) ? content.hashtags : [],
+      provider: provider || "ai",
+      model: model || "",
+      isFallback: Boolean(isFallback),
+      fallbackReason: fallbackReason || ""
+    });
+    dbService.pruneContentGenerationsByOwner(userId, 120).catch((pruneError) => {
+      console.error("[content] prune history failed", pruneError);
+    });
+  } catch (historyError) {
+    console.error("[content] saveGenerationHistory failed", historyError);
+  }
+}
+
+router.get("/history", requireAuth, async (req, res) => {
+  try {
+    const rawLimit = Number(req.query?.limit);
+    const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(100, Math.floor(rawLimit))) : 20;
+    const items = await dbService.listContentGenerationsByOwner(req.user.id, limit);
+    return res.json({ items });
+  } catch (error) {
+    console.error("[content] history failed", error);
+    return res.status(500).json({ message: "Khong the tai lich su noi dung." });
+  }
+});
+
 router.get("/quota", requireAuth, async (req, res) => {
   try {
     const user = req.user;
@@ -72,7 +132,7 @@ router.get("/quota", requireAuth, async (req, res) => {
     });
   } catch (error) {
     console.error("[content] quota failed", error);
-    return res.status(500).json({ message: "Không thể lấy hạn mức AI." });
+    return res.status(500).json({ message: "Khong the lay han muc AI." });
   }
 });
 
@@ -84,75 +144,95 @@ router.post("/generate", requireAuth, contentLimiter, async (req, res) => {
 
   const sanitizedPayload = sanitizeGeneratePayload(req.body);
   if (!sanitizedPayload) {
-    return res.status(400).json({ message: "Thiếu hoặc sai thông tin tạo nội dung." });
+    return res.status(400).json({ message: "Thieu hoac sai thong tin tao noi dung." });
   }
 
   try {
-    let user = userFromToken;
     if (currentCount >= planLimit.dailyContentGenerations) {
       return res.status(403).json({
-        message: `Bạn đã dùng hết lượt tạo nội dung hôm nay cho gói ${planLimit.label}.`,
-        plan: user.plan
+        message: `Ban da dung het luot tao noi dung hom nay cho goi ${planLimit.label}.`,
+        plan: userFromToken.plan
       });
     }
 
-    const content = await generateSpaContent(sanitizedPayload);
+    let content = null;
+    let meta = {
+      provider: "fallback_template",
+      model: "",
+      fallback: true,
+      reason: "provider_error",
+      notice: "He thong AI dang ban. Da tao ban nhap de ban dung ngay.",
+      providersTried: []
+    };
+
+    try {
+      const generated = await generateSpaContent(sanitizedPayload);
+      content = generated.content;
+      meta = {
+        provider: generated.provider || "ai",
+        model: generated.model || "",
+        fallback: false,
+        reason: "",
+        notice: "Da tao noi dung bang AI.",
+        providersTried: []
+      };
+    } catch (aiError) {
+      console.error("[content] generate failed", aiError);
+      const reason = typeof aiError?.reason === "string" ? aiError.reason : "provider_error";
+      const notice =
+        typeof aiError?.notice === "string"
+          ? aiError.notice
+          : "He thong AI dang ban. Da tao ban nhap de ban dung ngay.";
+      const providersTried = Array.isArray(aiError?.failures)
+        ? aiError.failures
+            .map((item) => String(item?.provider || "").trim())
+            .filter(Boolean)
+        : [];
+
+      content = generateFallbackSpaContent(sanitizedPayload);
+      meta = {
+        provider: "fallback_template",
+        model: "",
+        fallback: true,
+        reason,
+        notice,
+        providersTried
+      };
+    }
 
     currentCount += 1;
-    user = await dbService.updateUserById(user.id, {
+    const user = await dbService.updateUserById(userFromToken.id, {
       dailyUsageDateKey: today,
       dailyContentCount: currentCount
     });
     if (!user) {
-      return res.status(404).json({ message: "Không tìm thấy tài khoản." });
+      return res.status(404).json({ message: "Khong tim thay tai khoan." });
     }
+    cacheAuthUser(user);
 
-    return res.json({
+    await saveGenerationHistory({
+      userId: user.id,
+      payload: sanitizedPayload,
+      content,
+      provider: meta.provider || "ai",
+      model: meta.model || "",
+      isFallback: Boolean(meta.fallback),
+      fallbackReason: meta.reason || ""
+    });
+
+    return res.status(200).json({
       content,
       quota: {
         used: user.dailyContentCount,
         limit: planLimit.dailyContentGenerations,
         remaining: Math.max(planLimit.dailyContentGenerations - user.dailyContentCount, 0)
       },
-      meta: {
-        provider: "gemini",
-        fallback: false
-      }
+      meta
     });
   } catch (error) {
-    console.error("[content] generate failed", error);
-
-    const fallbackContent = generateFallbackSpaContent(sanitizedPayload);
-    const message = error instanceof Error ? error.message : "";
-
-    let reason = "provider_error";
-    let notice = "Đã chuyển sang chế độ dự phòng để tạo nội dung mẫu.";
-
-    if (message.includes("RESOURCE_EXHAUSTED") || message.includes("Quota exceeded")) {
-      reason = "quota";
-      notice = "Gemini hết quota, hệ thống đã dùng chế độ dự phòng.";
-    } else if (message.includes("API key not valid") || message.includes("invalid API key")) {
-      reason = "invalid_key";
-      notice = "GEMINI_API_KEY không hợp lệ, hệ thống đã dùng chế độ dự phòng.";
-    } else if (message.includes("GEMINI_API_KEY")) {
-      reason = "missing_key";
-      notice = "Server thiếu GEMINI_API_KEY, hệ thống đã dùng chế độ dự phòng.";
-    }
-
-    return res.status(200).json({
-      content: fallbackContent,
-      quota: {
-        used: currentCount,
-        limit: planLimit.dailyContentGenerations,
-        remaining: Math.max(planLimit.dailyContentGenerations - currentCount, 0)
-      },
-      meta: {
-        provider: "fallback_template",
-        fallback: true,
-        reason,
-        notice
-      }
-    });
+    console.error("[content] finalize generate failed", error);
+    const message = error instanceof Error ? error.message : "Khong the tao noi dung.";
+    return res.status(500).json({ message });
   }
 });
 

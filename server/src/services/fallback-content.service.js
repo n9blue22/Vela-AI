@@ -17,11 +17,21 @@ export function generateFallbackSpaContent({ profile, input }) {
   const audience = normalizeText(input?.audience, "kh\u00e1ch h\u00e0ng quan t\u00e2m l\u00e0m \u0111\u1eb9p");
   const goal = normalizeText(input?.goal, "t\u0103ng l\u1ecbch h\u1eb9n trong tu\u1ea7n");
   const note = normalizeText(input?.specialNote, "\u01b0u \u0111\u00e3i d\u00e0nh cho kh\u00e1ch m\u1edbi");
+  const normalizedService = service
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 3)
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`)
+    .join("");
 
   return {
-    headline: `${businessName}: \u01afu \u0111\u00e3i ${service} cho ${audience}`,
-    body: `${businessName} \u0111ang tri\u1ec3n khai ch\u01b0\u01a1ng tr\u00ecnh ${note}. N\u1ed9i dung t\u1eadp trung m\u1ee5c ti\u00eau ${goal}, quy tr\u00ecnh r\u00f5 r\u00e0ng, t\u01b0 v\u1ea5n nhanh v\u00e0 d\u1ec5 \u0111\u1eb7t l\u1ecbch.`,
-    cta: channelCta(input?.channel),
-    replyTemplate: `Spa c\u1ea3m \u01a1n ch\u1ecb \u0111\u00e3 nh\u1eafn tin. Em g\u1eedi ngay th\u00f4ng tin ${service}, m\u1ee9c \u01b0u \u0111\u00e3i hi\u1ec7n t\u1ea1i v\u00e0 khung gi\u1edd tr\u1ed1ng h\u00f4m nay \u0111\u1ec3 ch\u1ecb ch\u1ecdn nhanh \u1ea1.`
+    headline: `Da đang lên tiếng? ${businessName} có lịch chăm sóc riêng cho ${audience}`,
+    body: `✨ Nhiều chị em chỉ thật sự chú ý đến làn da khi soi gương thấy da xạm, kém mịn hoặc mất sức sống.\n\nTại ${businessName}, ${service} được thiết kế để giúp bạn thư giãn, được tư vấn rõ ràng và có lộ trình phù hợp hơn. ${note ? `\n\n🎁 ${note}` : ""}\n\nMục tiêu của tuần này: ${goal}, nhưng vẫn giữ cách tư vấn nhẹ nhàng và dễ đặt lịch.`,
+    cta: `\ud83d\udc47 ${channelCta(input?.channel)}`,
+    replyTemplate: `Spa cảm ơn chị đã nhắn tin. Em hỏi nhanh mình đang quan tâm ${service} hay cần tư vấn tình trạng da trước ạ? Em gửi lịch trống hôm nay và mức ưu đãi hiện tại để chị chọn khung giờ phù hợp.`,
+    hashtags: ["#LamDep", "#SpaChuyenSau", normalizedService ? `#${normalizedService}` : "#ChamSocDa"].slice(0, 5)
   };
 }

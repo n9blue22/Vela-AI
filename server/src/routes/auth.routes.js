@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import express from "express";
 import { env } from "../config/env.js";
-import { requireAuth } from "../middleware/auth.js";
+import { cacheAuthUser, requireAuth } from "../middleware/auth.js";
 import { createTokenBucketLimiter } from "../middleware/rate-limit.js";
 import { dbService } from "../services/db.service.js";
 import { serializeUser } from "../services/user.service.js";
@@ -76,6 +76,7 @@ router.post("/register", registerLimiter, async (req, res) => {
       emailVerificationTokenHash: "",
       emailVerificationExpiresAt: null
     });
+    cacheAuthUser(user);
 
     return res.status(201).json({
       message: "Đăng ký thành công. Tài khoản đã sẵn sàng sử dụng.",
@@ -110,6 +111,7 @@ router.post("/login", loginLimiter, async (req, res) => {
       return res.status(401).json({ message: "Email hoặc mật khẩu không đúng." });
     }
 
+    cacheAuthUser(user);
     const token = signAccessToken({ userId: user.id });
     return res.json({
       token,
@@ -198,6 +200,7 @@ router.post("/reset-password", resetPasswordLimiter, async (req, res) => {
     if (!updated) {
       return res.status(404).json({ message: "Không tìm thấy tài khoản." });
     }
+    cacheAuthUser(updated);
 
     return res.json({ message: "Đặt lại mật khẩu thành công." });
   } catch (error) {
@@ -252,6 +255,7 @@ router.patch("/me", requireAuth, async (req, res) => {
     if (!updatedUser) {
       return res.status(404).json({ message: "Không tìm thấy tài khoản." });
     }
+    cacheAuthUser(updatedUser);
 
     return res.json({
       message: "Cập nhật tài khoản thành công.",

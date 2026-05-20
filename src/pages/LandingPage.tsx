@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
-import { CheckCircle2, Sparkles, TimerReset, UsersRound } from "lucide-react";
+import { CheckCircle2, TimerReset, UsersRound } from "lucide-react";
 import { useAuth } from "../features/auth/AuthProvider";
+import { AppBrand } from "../shared/components/layout/AppBrand";
 import { planOptions } from "../shared/constants/plans";
 
 function planActionLink(planId: string, isLoggedIn: boolean): string {
@@ -17,12 +18,7 @@ export function LandingPage() {
     <div className="min-h-screen text-text">
       <header className="sticky top-0 z-30 border-b border-line/70 bg-panel/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-[1180px] items-center justify-between gap-4 px-4 py-3">
-          <div className="inline-flex items-center gap-2">
-            <div className="inline-flex h-9 w-9 items-center justify-center rounded-card bg-primary text-white">
-              <Sparkles size={16} />
-            </div>
-            <p className="text-sm font-extrabold">Spa AI Studio</p>
-          </div>
+          <AppBrand logoClassName="h-10 max-w-[170px] sm:max-w-[210px]" />
 
           <nav className="hidden items-center gap-5 text-sm font-semibold text-subtext md:inline-flex">
             <a href="#welcome" className="hover:text-text">
