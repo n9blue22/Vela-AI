@@ -5,31 +5,31 @@
 @tailwind utilities;
 
 :root {
-  --color-bg: 196 35% 96%;
+  --color-bg: 330 52% 97%;
   --color-panel: 0 0% 100%;
-  --color-panel-alt: 188 28% 93%;
-  --color-line: 194 20% 78%;
-  --color-text: 204 30% 14%;
-  --color-subtext: 201 15% 35%;
-  --color-primary: 169 67% 36%;
-  --color-primary-strong: 169 72% 29%;
-  --color-success: 152 66% 30%;
-  --color-danger: 6 78% 50%;
-  --color-warning: 33 94% 46%;
+  --color-panel-alt: 340 42% 95%;
+  --color-line: 336 22% 84%;
+  --color-text: 330 30% 14%;
+  --color-subtext: 328 12% 39%;
+  --color-primary: 342 64% 58%;
+  --color-primary-strong: 342 58% 47%;
+  --color-success: 150 45% 40%;
+  --color-danger: 5 72% 55%;
+  --color-warning: 32 88% 54%;
 }
 
 :root[data-theme="dark"] {
-  --color-bg: 201 23% 10%;
-  --color-panel: 202 21% 15%;
-  --color-panel-alt: 203 19% 19%;
-  --color-line: 201 16% 30%;
-  --color-text: 190 18% 92%;
-  --color-subtext: 193 12% 70%;
-  --color-primary: 168 72% 45%;
-  --color-primary-strong: 169 80% 37%;
-  --color-success: 151 70% 41%;
-  --color-danger: 6 82% 58%;
-  --color-warning: 33 94% 53%;
+  --color-bg: 326 20% 9%;
+  --color-panel: 328 17% 14%;
+  --color-panel-alt: 325 14% 18%;
+  --color-line: 325 11% 31%;
+  --color-text: 330 24% 94%;
+  --color-subtext: 326 11% 70%;
+  --color-primary: 344 72% 65%;
+  --color-primary-strong: 344 64% 55%;
+  --color-success: 151 48% 50%;
+  --color-danger: 5 78% 61%;
+  --color-warning: 32 94% 60%;
 }
 
 * {
@@ -39,9 +39,9 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at 15% 0%, hsl(171 68% 90%), transparent 45%),
-    radial-gradient(circle at 100% 100%, hsl(36 79% 88%), transparent 33%),
-    radial-gradient(circle at 80% 35%, hsl(197 48% 89%), transparent 40%),
+  background: radial-gradient(circle at 12% 0%, hsl(344 78% 92%), transparent 36%),
+    radial-gradient(circle at 88% 12%, hsl(152 56% 88%), transparent 31%),
+    radial-gradient(circle at 100% 92%, hsl(32 92% 90%), transparent 30%),
     hsl(var(--color-bg));
   color: hsl(var(--color-text));
   font-family: "Manrope", "Segoe UI", "Helvetica Neue", sans-serif;
@@ -50,9 +50,9 @@ body {
 }
 
 :root[data-theme="dark"] body {
-  background: radial-gradient(circle at 15% 0%, hsl(170 52% 21%), transparent 43%),
-    radial-gradient(circle at 100% 100%, hsl(27 52% 20%), transparent 34%),
-    radial-gradient(circle at 80% 35%, hsl(197 45% 16%), transparent 40%),
+  background: radial-gradient(circle at 8% 0%, hsl(342 49% 22% / 0.9), transparent 34%),
+    radial-gradient(circle at 88% 16%, hsl(154 45% 18% / 0.75), transparent 30%),
+    radial-gradient(circle at 100% 100%, hsl(31 56% 20% / 0.72), transparent 28%),
     hsl(var(--color-bg));
 }
 

@@ -125,6 +125,35 @@ export function mapIntegrationWebhookEventRow(row) {
   };
 }
 
+export function mapSocialProfileRow(row) {
+  return {
+    id: row.id,
+    ownerUserId: row.owner_user_id,
+    provider: row.provider || "zernio",
+    providerProfileId: row.provider_profile_id || "",
+    displayName: row.display_name || "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+export function mapSocialAccountRow(row) {
+  return {
+    id: row.id,
+    ownerUserId: row.owner_user_id,
+    provider: row.provider || "zernio",
+    platform: row.platform || "",
+    providerProfileId: row.provider_profile_id || "",
+    providerAccountId: row.provider_account_id || "",
+    displayName: row.display_name || "",
+    username: row.username || "",
+    profileUrl: row.profile_url || "",
+    status: row.status || "connected",
+    connectedAt: row.connected_at,
+    updatedAt: row.updated_at
+  };
+}
+
 export const dbService = {
   async getUserById(userId) {
     const supabase = getSupabaseClient();
@@ -308,13 +337,19 @@ export const dbService = {
     return Boolean(data?.id);
   },
 
-  async listTasksByOwner(ownerUserId) {
+  async listTasksByOwner(ownerUserId, options = {}) {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from("tasks")
       .select("*")
       .eq("owner_user_id", ownerUserId)
       .order("created_at", { ascending: false });
+
+    if (!options.includeAdmin) {
+      query = query.neq("type", "admin");
+    }
+
+    const { data, error } = await query;
     handleError("listTasksByOwner", error);
     return (data || []).map(mapTaskRow);
   },
@@ -448,6 +483,101 @@ export const dbService = {
     return (data || []).map(mapIntegrationWebhookEventRow);
   },
 
+  async getSocialProfileByOwner(ownerUserId, provider = "zernio") {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from("social_profiles")
+      .select("*")
+      .eq("owner_user_id", ownerUserId)
+      .eq("provider", provider)
+      .maybeSingle();
+    handleError("getSocialProfileByOwner", error);
+    return data ? mapSocialProfileRow(data) : null;
+  },
+
+  async upsertSocialProfile(payload) {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from("social_profiles")
+      .upsert(
+        {
+          owner_user_id: payload.ownerUserId,
+          provider: payload.provider || "zernio",
+          provider_profile_id: payload.providerProfileId,
+          display_name: payload.displayName || ""
+        },
+        { onConflict: "owner_user_id,provider" }
+      )
+      .select("*")
+      .single();
+    handleError("upsertSocialProfile", error);
+    return mapSocialProfileRow(data);
+  },
+
+  async listSocialAccountsByOwner(ownerUserId, provider = "zernio") {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from("social_accounts")
+      .select("*")
+      .eq("owner_user_id", ownerUserId)
+      .eq("provider", provider)
+      .order("platform", { ascending: true });
+    handleError("listSocialAccountsByOwner", error);
+    return (data || []).map(mapSocialAccountRow);
+  },
+
+  async getSocialAccountByOwnerPlatform(ownerUserId, platform, provider = "zernio") {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from("social_accounts")
+      .select("*")
+      .eq("owner_user_id", ownerUserId)
+      .eq("provider", provider)
+      .eq("platform", platform)
+      .maybeSingle();
+    handleError("getSocialAccountByOwnerPlatform", error);
+    return data ? mapSocialAccountRow(data) : null;
+  },
+
+  async upsertSocialAccount(payload) {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from("social_accounts")
+      .upsert(
+        {
+          owner_user_id: payload.ownerUserId,
+          provider: payload.provider || "zernio",
+          platform: payload.platform,
+          provider_profile_id: payload.providerProfileId,
+          provider_account_id: payload.providerAccountId,
+          display_name: payload.displayName || "",
+          username: payload.username || "",
+          profile_url: payload.profileUrl || "",
+          status: payload.status || "connected",
+          connected_at: payload.connectedAt || new Date().toISOString()
+        },
+        { onConflict: "owner_user_id,provider,platform" }
+      )
+      .select("*")
+      .single();
+    handleError("upsertSocialAccount", error);
+    return mapSocialAccountRow(data);
+  },
+
+  async deleteSocialAccountByOwnerPlatform(ownerUserId, platform, provider = "zernio") {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from("social_accounts")
+      .delete()
+      .eq("owner_user_id", ownerUserId)
+      .eq("provider", provider)
+      .eq("platform", platform)
+      .select("id")
+      .maybeSingle();
+    handleError("deleteSocialAccountByOwnerPlatform", error);
+    return Boolean(data?.id);
+  },
+
   async pruneContentGenerationsByOwner(ownerUserId, keepLimit = 120) {
     const supabase = getSupabaseClient();
     const safeKeepLimit = Number.isFinite(keepLimit) ? Math.max(20, Math.min(1000, Math.floor(keepLimit))) : 120;
@@ -469,7 +599,7 @@ export const dbService = {
     return staleIds.length;
   },
 
-  async updateTaskByOwner(taskId, ownerUserId, patch) {
+  async updateTaskByOwner(taskId, ownerUserId, patch, options = {}) {
     const supabase = getSupabaseClient();
     const nextPatch = {};
     if (patch.title !== undefined) nextPatch.title = patch.title;
@@ -479,26 +609,34 @@ export const dbService = {
     if (patch.dueAt !== undefined) nextPatch.due_at = patch.dueAt;
     if (!hasOwnKeys(nextPatch)) return null;
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("tasks")
       .update(nextPatch)
       .eq("id", taskId)
-      .eq("owner_user_id", ownerUserId)
-      .select("*")
-      .maybeSingle();
+      .eq("owner_user_id", ownerUserId);
+
+    if (!options.includeAdmin) {
+      query = query.neq("type", "admin");
+    }
+
+    const { data, error } = await query.select("*").maybeSingle();
     handleError("updateTaskByOwner", error);
     return data ? mapTaskRow(data) : null;
   },
 
-  async deleteTaskByOwner(taskId, ownerUserId) {
+  async deleteTaskByOwner(taskId, ownerUserId, options = {}) {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from("tasks")
       .delete()
       .eq("id", taskId)
-      .eq("owner_user_id", ownerUserId)
-      .select("id")
-      .maybeSingle();
+      .eq("owner_user_id", ownerUserId);
+
+    if (!options.includeAdmin) {
+      query = query.neq("type", "admin");
+    }
+
+    const { data, error } = await query.select("id").maybeSingle();
     handleError("deleteTaskByOwner", error);
     return Boolean(data?.id);
   },

@@ -45,6 +45,7 @@ export interface AutoPostPublishResult {
   publishedAt?: string | null;
   scheduledFor?: string | null;
   accountId?: string;
+  accountName?: string;
   code?: string;
 }
 
@@ -55,6 +56,16 @@ export interface AutoPostPublishResponse {
   publishedCount: number;
   failedCount: number;
   results: AutoPostPublishResult[];
+}
+
+export interface SocialAccount {
+  id: string;
+  platform: "facebook" | "instagram";
+  displayName: string;
+  username: string;
+  status: "connected" | "disconnected" | "expired";
+  connectedAt: string;
+  updatedAt: string;
 }
 
 export const appService = {
@@ -193,6 +204,45 @@ export const appService = {
       token,
       body: payload,
       timeoutMs: 40000
+    });
+  },
+  async getSocialAccounts(token: string) {
+    return apiRequest<{ accounts: SocialAccount[] }>("/integrations/zernio/accounts", {
+      token
+    });
+  },
+  async createSocialConnectUrl(token: string, platform: "facebook" | "instagram") {
+    return apiRequest<{ authUrl: string; platform: "facebook" | "instagram"; profileId: string }>(
+      "/integrations/zernio/connect-url",
+      {
+        method: "POST",
+        token,
+        body: { platform },
+        timeoutMs: 30000
+      }
+    );
+  },
+  async completeSocialConnect(
+    token: string,
+    payload: {
+      platform: "facebook" | "instagram";
+      profileId: string;
+      accountId: string;
+      username?: string;
+      displayName?: string;
+    }
+  ) {
+    return apiRequest<{ message: string; account: SocialAccount }>("/integrations/zernio/connect/complete", {
+      method: "POST",
+      token,
+      body: payload,
+      timeoutMs: 30000
+    });
+  },
+  async disconnectSocialAccount(token: string, platform: "facebook" | "instagram") {
+    return apiRequest<{ message: string }>(`/integrations/zernio/accounts/${platform}`, {
+      method: "DELETE",
+      token
     });
   },
   async getAdminOverview(token: string) {

@@ -159,6 +159,117 @@ function pickAccountId(row) {
   return String(row?._id || row?.id || row?.accountId || "").trim();
 }
 
+function pickProfileId(row) {
+  const profile = row?.profileId || row?.profile || row?.profile_id;
+  if (profile && typeof profile === "object") {
+    return String(profile._id || profile.id || profile.profileId || "").trim();
+  }
+  return String(profile || "").trim();
+}
+
+function pickProfileName(row) {
+  const profile = row?.profileId || row?.profile || {};
+  if (profile && typeof profile === "object") {
+    return String(profile.name || profile.displayName || "").trim();
+  }
+  return "";
+}
+
+function pickProfileFromPayload(payload) {
+  return payload?.profile || payload?.data?.profile || payload?.data || payload;
+}
+
+function normalizeAccountRow(row) {
+  return {
+    accountId: pickAccountId(row),
+    platform: String(row?.platform || "").trim().toLowerCase(),
+    profileId: pickProfileId(row),
+    profileName: pickProfileName(row),
+    username: String(row?.username || row?.handle || "").trim(),
+    displayName: String(row?.displayName || row?.name || row?.username || "").trim(),
+    profileUrl: String(row?.profileUrl || row?.url || "").trim(),
+    isActive: row?.isActive !== false,
+    raw: row || {}
+  };
+}
+
+export async function createProfileForUser({ name, email, userId }) {
+  const cleanName = String(name || email || "Khach hang").trim().slice(0, 80);
+  const profileName = cleanName || `Khach hang ${String(userId || "").slice(0, 8)}`;
+  const created = await requestZernio("/profiles", {
+    method: "POST",
+    body: {
+      name: profileName,
+      description: `Social profile for ${String(email || userId || "EMS customer").slice(0, 120)}`,
+      color: "#d6678d"
+    }
+  });
+  const profile = pickProfileFromPayload(created);
+  const profileId = String(profile?._id || profile?.id || profile?.profileId || "").trim();
+  if (!profileId) {
+    throw new Error("Zernio khong tra ve ma ho so ket noi. Vui long thu lai.");
+  }
+  return {
+    providerProfileId: profileId,
+    displayName: String(profile?.name || profileName).trim()
+  };
+}
+
+export async function getConnectUrl({ platform, profileId, redirectUrl }) {
+  const platformKey = String(platform || "").trim().toLowerCase();
+  const safeProfileId = String(profileId || "").trim();
+  if (!platformKey || !safeProfileId) {
+    throw new Error("Thieu thong tin ket noi mang xa hoi.");
+  }
+
+  const query = new URLSearchParams({
+    profileId: safeProfileId
+  });
+  if (redirectUrl) {
+    query.set("redirect_url", String(redirectUrl));
+  }
+
+  const result = await requestZernio(`/connect/${encodeURIComponent(platformKey)}?${query.toString()}`);
+  const authUrl = String(result?.authUrl || result?.connectUrl || result?.redirectUrl || result?.url || "").trim();
+  if (!authUrl) {
+    throw new Error("Zernio khong tra ve link ket noi. Vui long thu lai.");
+  }
+  return {
+    authUrl,
+    state: String(result?.state || "").trim()
+  };
+}
+
+export async function listConnectedAccounts({ profileId, platform } = {}) {
+  const query = new URLSearchParams();
+  if (profileId) query.set("profileId", String(profileId));
+  if (platform) query.set("platform", String(platform).toLowerCase());
+  query.set("includeOverLimit", "true");
+
+  const result = await requestZernio(`/accounts${query.toString() ? `?${query.toString()}` : ""}`);
+  const rows = Array.isArray(result?.accounts)
+    ? result.accounts
+    : Array.isArray(result?.data)
+      ? result.data
+      : Array.isArray(result)
+        ? result
+        : [];
+  return rows.map(normalizeAccountRow).filter((account) => account.accountId);
+}
+
+export async function findConnectedAccount({ profileId, platform, accountId }) {
+  const platformKey = String(platform || "").trim().toLowerCase();
+  const expectedAccountId = String(accountId || "").trim();
+  const accounts = await listConnectedAccounts({ profileId, platform: platformKey });
+  const account = accounts.find((item) => {
+    const sameAccount = !expectedAccountId || item.accountId === expectedAccountId;
+    const samePlatform = !platformKey || item.platform === platformKey;
+    const sameProfile = !profileId || !item.profileId || item.profileId === profileId;
+    return sameAccount && samePlatform && sameProfile;
+  });
+  return account || null;
+}
+
 export async function findActiveAccountId(platform) {
   const platformKey = String(platform || "").trim().toLowerCase();
   if (!platformKey) return null;

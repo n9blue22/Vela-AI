@@ -8,13 +8,16 @@ interface BadgeProps extends PropsWithChildren {
 }
 
 const toneClasses: Record<BadgeTone, string> = {
-  neutral: "border-line bg-panelAlt text-subtext",
+  neutral: "border-line bg-panelAlt/90 text-subtext",
   success: "border-success/20 bg-success/10 text-success",
   warning: "border-warning/20 bg-warning/10 text-warning",
   danger: "border-danger/20 bg-danger/10 text-danger"
 };
 
 export function Badge({ children, tone = "neutral" }: BadgeProps) {
-  return <span className={cn("inline-flex rounded px-2 py-1 text-xs font-semibold", toneClasses[tone])}>{children}</span>;
+  return (
+    <span className={cn("inline-flex rounded-card border px-2.5 py-1 text-xs font-semibold", toneClasses[tone])}>
+      {children}
+    </span>
+  );
 }
-

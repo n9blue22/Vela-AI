@@ -90,6 +90,40 @@ create table if not exists public.integration_webhook_events (
 create index if not exists integration_webhook_events_provider_received_at_idx
 on public.integration_webhook_events(provider, received_at desc);
 
+create table if not exists public.social_profiles (
+  id uuid primary key default gen_random_uuid(),
+  owner_user_id uuid not null references public.users(id) on delete cascade,
+  provider text not null default 'zernio' check (provider in ('zernio')),
+  provider_profile_id text not null,
+  display_name text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(owner_user_id, provider),
+  unique(provider, provider_profile_id)
+);
+
+create index if not exists social_profiles_owner_provider_idx
+on public.social_profiles(owner_user_id, provider);
+
+create table if not exists public.social_accounts (
+  id uuid primary key default gen_random_uuid(),
+  owner_user_id uuid not null references public.users(id) on delete cascade,
+  provider text not null default 'zernio' check (provider in ('zernio')),
+  platform text not null check (platform in ('facebook', 'instagram')),
+  provider_profile_id text not null,
+  provider_account_id text not null,
+  display_name text not null default '',
+  username text not null default '',
+  profile_url text not null default '',
+  status text not null default 'connected' check (status in ('connected', 'disconnected', 'expired')),
+  connected_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(owner_user_id, provider, platform)
+);
+
+create index if not exists social_accounts_owner_provider_platform_idx
+on public.social_accounts(owner_user_id, provider, platform);
+
 create index if not exists users_role_created_at_idx
 on public.users(role, created_at desc);
 
@@ -98,6 +132,8 @@ alter table public.leads enable row level security;
 alter table public.tasks enable row level security;
 alter table public.content_generations enable row level security;
 alter table public.integration_webhook_events enable row level security;
+alter table public.social_profiles enable row level security;
+alter table public.social_accounts enable row level security;
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -124,5 +160,17 @@ execute procedure public.set_updated_at();
 drop trigger if exists set_tasks_updated_at on public.tasks;
 create trigger set_tasks_updated_at
 before update on public.tasks
+for each row
+execute procedure public.set_updated_at();
+
+drop trigger if exists set_social_profiles_updated_at on public.social_profiles;
+create trigger set_social_profiles_updated_at
+before update on public.social_profiles
+for each row
+execute procedure public.set_updated_at();
+
+drop trigger if exists set_social_accounts_updated_at on public.social_accounts;
+create trigger set_social_accounts_updated_at
+before update on public.social_accounts
 for each row
 execute procedure public.set_updated_at();

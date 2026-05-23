@@ -5,7 +5,7 @@ import { isValidUuid, normalizeDateOnly, normalizeOptionalText, normalizeText } 
 
 const router = express.Router();
 
-const TASK_TYPES = new Set(["marketing", "follow_up", "booking", "admin"]);
+const CUSTOMER_TASK_TYPES = new Set(["marketing", "follow_up", "booking"]);
 const TASK_STATUSES = new Set(["todo", "in_progress", "done"]);
 
 router.get("/", requireAuth, async (req, res) => {
@@ -26,7 +26,7 @@ router.post("/", requireAuth, async (req, res) => {
     const status = req.body?.status ? String(req.body.status) : "todo";
     const dueAt = req.body?.dueAt ? normalizeDateOnly(req.body.dueAt) : null;
 
-    if (!title || description === null || !TASK_TYPES.has(type) || !TASK_STATUSES.has(status)) {
+    if (!title || description === null || !CUSTOMER_TASK_TYPES.has(type) || !TASK_STATUSES.has(status)) {
       return res.status(400).json({ message: "Thông tin công việc không hợp lệ." });
     }
 
@@ -73,7 +73,7 @@ router.patch("/:taskId", requireAuth, async (req, res) => {
 
     if (req.body.type !== undefined) {
       const type = String(req.body.type);
-      if (!TASK_TYPES.has(type)) return res.status(400).json({ message: "Loại task không hợp lệ." });
+      if (!CUSTOMER_TASK_TYPES.has(type)) return res.status(400).json({ message: "Loại task không hợp lệ." });
       patch.type = type;
     }
 

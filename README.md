@@ -29,7 +29,7 @@ If all providers fail, backend returns a built-in draft template so user flow do
 npm install
 ```
 
-2. Create `.env` from `.env.example`, then fill:
+2. Create `.env` manually at project root, then fill:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `JWT_SECRET`
@@ -59,6 +59,15 @@ npm run dev
 ## Zernio webhook (easy explanation)
 
 Webhook is a public URL in your backend so Zernio can report publishing status (`published`, `failed`, `partial`).
+
+## Zernio customer social accounts
+
+Auto-post is now user-scoped:
+- Each customer connects their own Facebook/Instagram in the app.
+- The publish endpoint only uses the account saved for the currently logged-in customer.
+- The global `ZERNIO_ACCOUNT_ID_FACEBOOK` / `ZERNIO_ACCOUNT_ID_INSTAGRAM` values are not used for customer publishing.
+
+After pulling this change, run `supabase/schema.sql` again in Supabase SQL Editor so the new `social_profiles` and `social_accounts` tables exist.
 
 ### 1) Webhook URL you need to put in Zernio
 

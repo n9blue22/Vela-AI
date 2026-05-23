@@ -5,10 +5,11 @@ import { requireAuth } from "../middleware/auth.js";
 import { createTokenBucketLimiter } from "../middleware/rate-limit.js";
 import { dbService } from "../services/db.service.js";
 import {
-  buildAccountIdMapFromEnv,
+  createProfileForUser,
   createMediaPresign,
   detectMediaKind,
-  findActiveAccountId,
+  findConnectedAccount,
+  getConnectUrl,
   isSupportedMediaContentType,
   publishByPlatform
 } from "../services/zernio.service.js";
@@ -81,6 +82,15 @@ function normalizePlatformList(rawPlatforms) {
     .map((platform) => String(platform || "").trim().toLowerCase())
     .filter((platform) => SUPPORTED_PLATFORMS.has(platform));
   return Array.from(new Set(normalized));
+}
+
+function normalizePlatform(rawPlatform) {
+  const platform = String(rawPlatform || "").trim().toLowerCase();
+  return SUPPORTED_PLATFORMS.has(platform) ? platform : "";
+}
+
+function buildZernioRedirectUrl() {
+  return String(env.ZERNIO_CONNECT_REDIRECT_URL || `${env.FRONTEND_URL.replace(/\/+$/, "")}/app`).trim();
 }
 
 function normalizeFileName(fileName) {
@@ -262,6 +272,122 @@ router.post("/zernio/media/presign", requireAuth, autoPostLimiter, jsonParser, a
   }
 });
 
+router.get("/zernio/accounts", requireAuth, async (req, res) => {
+  try {
+    const accounts = await dbService.listSocialAccountsByOwner(req.user.id, "zernio");
+    return res.json({ accounts });
+  } catch (error) {
+    console.error("[integrations] list social accounts failed", error);
+    const message = error instanceof Error ? error.message : "Khong the lay tai khoan dang bai.";
+    return res.status(500).json({ message });
+  }
+});
+
+router.post("/zernio/connect-url", requireAuth, autoPostLimiter, jsonParser, async (req, res) => {
+  try {
+    const platform = normalizePlatform(req.body?.platform);
+    if (!platform) {
+      return res.status(400).json({ message: "Nen tang ket noi khong hop le." });
+    }
+
+    let profile = await dbService.getSocialProfileByOwner(req.user.id, "zernio");
+    if (!profile) {
+      const createdProfile = await createProfileForUser({
+        name: req.user.name,
+        email: req.user.email,
+        userId: req.user.id
+      });
+      profile = await dbService.upsertSocialProfile({
+        ownerUserId: req.user.id,
+        provider: "zernio",
+        providerProfileId: createdProfile.providerProfileId,
+        displayName: createdProfile.displayName
+      });
+    }
+
+    const connect = await getConnectUrl({
+      platform,
+      profileId: profile.providerProfileId,
+      redirectUrl: buildZernioRedirectUrl()
+    });
+
+    return res.json({
+      authUrl: connect.authUrl,
+      platform,
+      profileId: profile.providerProfileId
+    });
+  } catch (error) {
+    console.error("[integrations] create zernio connect url failed", error);
+    const message = error instanceof Error ? error.message : "Khong tao duoc link ket noi mang xa hoi.";
+    return res.status(500).json({ message });
+  }
+});
+
+router.post("/zernio/connect/complete", requireAuth, autoPostLimiter, jsonParser, async (req, res) => {
+  try {
+    const platform = normalizePlatform(req.body?.platform || req.body?.connected);
+    const profileId = String(req.body?.profileId || "").trim();
+    const accountId = String(req.body?.accountId || req.body?.id || "").trim();
+
+    if (!platform || !profileId || !accountId) {
+      return res.status(400).json({ message: "Thieu thong tin xac nhan ket noi mang xa hoi." });
+    }
+
+    const profile = await dbService.getSocialProfileByOwner(req.user.id, "zernio");
+    if (!profile || profile.providerProfileId !== profileId) {
+      return res.status(403).json({ message: "Ho so ket noi khong thuoc tai khoan nay." });
+    }
+
+    const verifiedAccount = await findConnectedAccount({
+      profileId,
+      platform,
+      accountId
+    });
+    if (!verifiedAccount) {
+      return res.status(400).json({
+        message: "Chua xac nhan duoc tai khoan vua ket noi. Vui long thu lai sau khi hoan tat OAuth."
+      });
+    }
+
+    const account = await dbService.upsertSocialAccount({
+      ownerUserId: req.user.id,
+      provider: "zernio",
+      platform,
+      providerProfileId: profile.providerProfileId,
+      providerAccountId: verifiedAccount.accountId,
+      displayName: verifiedAccount.displayName || req.body?.displayName || req.body?.username || platform,
+      username: verifiedAccount.username || req.body?.username || "",
+      profileUrl: verifiedAccount.profileUrl || "",
+      status: verifiedAccount.isActive ? "connected" : "expired",
+      connectedAt: new Date().toISOString()
+    });
+
+    return res.json({
+      message: "Da ket noi tai khoan dang bai.",
+      account
+    });
+  } catch (error) {
+    console.error("[integrations] complete zernio connect failed", error);
+    const message = error instanceof Error ? error.message : "Khong the luu tai khoan mang xa hoi.";
+    return res.status(500).json({ message });
+  }
+});
+
+router.delete("/zernio/accounts/:platform", requireAuth, async (req, res) => {
+  try {
+    const platform = normalizePlatform(req.params.platform);
+    if (!platform) {
+      return res.status(400).json({ message: "Nen tang ket noi khong hop le." });
+    }
+    await dbService.deleteSocialAccountByOwnerPlatform(req.user.id, platform, "zernio");
+    return res.json({ message: "Da go ket noi tren ung dung." });
+  } catch (error) {
+    console.error("[integrations] disconnect social account failed", error);
+    const message = error instanceof Error ? error.message : "Khong the go ket noi.";
+    return res.status(500).json({ message });
+  }
+});
+
 router.post("/zernio/publish", requireAuth, autoPostLimiter, jsonParser, async (req, res) => {
   try {
     const caption = String(req.body?.caption || "").trim();
@@ -285,7 +411,6 @@ router.post("/zernio/publish", requireAuth, autoPostLimiter, jsonParser, async (
     const { mode, scheduleAtIso } = resolveScheduleTime(req.body?.mode, req.body?.scheduleAt);
     const timezone = String(req.body?.timezone || env.ZERNIO_DEFAULT_TIMEZONE || "Asia/Bangkok").trim();
     const useAntiSpamJitter = req.body?.antiSpamJitter !== false;
-    const envAccounts = buildAccountIdMapFromEnv();
     const enabledPlatforms = new Set((env.ZERNIO_ENABLED_PLATFORMS || []).map((item) => String(item).toLowerCase()));
 
     const targets = [];
@@ -296,19 +421,23 @@ router.post("/zernio/publish", requireAuth, autoPostLimiter, jsonParser, async (
         continue;
       }
 
-      const accountId = envAccounts[platform] || (await findActiveAccountId(platform));
-      if (!accountId) {
+      const socialAccount = await dbService.getSocialAccountByOwnerPlatform(req.user.id, platform, "zernio");
+      if (!socialAccount || socialAccount.status !== "connected" || !socialAccount.providerAccountId) {
         skipped.push(
-          buildPlatformFailure(platform, "Chua tim thay tai khoan da ket noi cho nen tang nay.", "account_missing")
+          buildPlatformFailure(platform, "Ban can ket noi tai khoan nay truoc khi dang bai.", "account_missing")
         );
         continue;
       }
-      targets.push({ platform, accountId });
+      targets.push({
+        platform,
+        accountId: socialAccount.providerAccountId,
+        displayName: socialAccount.displayName || socialAccount.username || platform
+      });
     }
 
     if (!targets.length) {
       return res.status(400).json({
-        message: "Chua co tai khoan Facebook/Instagram hop le de dang bai.",
+        message: "Hay ket noi Facebook/Instagram cua khach hang truoc khi dang bai.",
         results: skipped
       });
     }
@@ -332,7 +461,7 @@ router.post("/zernio/publish", requireAuth, autoPostLimiter, jsonParser, async (
     settled.forEach((result, index) => {
       const target = targets[index];
       if (result.status === "fulfilled") {
-        successResults.push({ ...result.value, ok: true, accountId: target.accountId });
+        successResults.push({ ...result.value, ok: true, accountId: target.accountId, accountName: target.displayName });
       } else {
         const reason = result.reason instanceof Error ? result.reason : new Error("Dang bai that bai.");
         failedResults.push(buildPlatformFailure(target.platform, reason.message, reason.code || ""));

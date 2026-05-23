@@ -1,15 +1,21 @@
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  AlertCircle,
+  CalendarDays,
   ChevronDown,
   CheckCircle2,
+  CircleDot,
   Clock3,
   ClipboardList,
   Copy,
   Crown,
+  FileText,
   ImagePlus,
   LayoutDashboard,
+  ListChecks,
   LogOut,
+  Megaphone,
   MessageSquareText,
   MoonStar,
   PencilLine,
@@ -18,13 +24,15 @@ import {
   SunMedium,
   Trash2,
   UploadCloud,
+  UserPlus,
+  WandSparkles,
   UsersRound
 } from "lucide-react";
 import { useAuth } from "../features/auth/AuthProvider";
 import { UpgradePlanModal } from "../features/billing/UpgradePlanModal";
 import { useTheme } from "../hooks/useTheme";
 import { useToast } from "../hooks/useToast";
-import { AutoPostPublishResponse, appService } from "../services/app.service";
+import { AutoPostPublishResponse, SocialAccount, appService } from "../services/app.service";
 import { AppBrand } from "../shared/components/layout/AppBrand";
 import {
   PaidPlan,
@@ -42,11 +50,65 @@ import { InputField, SelectField, TextAreaField } from "../shared/components/ui/
 import { ContentHistoryItem, Lead, TaskItem } from "../types";
 
 type TabKey = "overview" | "content" | "leads" | "tasks" | "autopost";
+type AutoPostPlatform = "facebook" | "instagram";
 type AutoPostMediaWarning = {
   fileName: string;
   level: "info" | "warning";
   message: string;
 };
+
+const autoPostPlatformOptions: Array<{ id: AutoPostPlatform; label: string; note: string }> = [
+  { id: "facebook", label: "Facebook", note: "Đăng vào Page đã kết nối" },
+  { id: "instagram", label: "Instagram", note: "Business/Creator đã liên kết" }
+];
+
+function PanelHeader({
+  icon,
+  title,
+  description,
+  action
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex w-full flex-wrap items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-card border border-primary/20 bg-primary/10 text-primary">
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-xl font-extrabold leading-tight text-text">{title}</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-subtext">{description}</p>
+        </div>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function EmptyState({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
+  return (
+    <div className="grid place-items-center rounded-card border border-dashed border-line bg-panelAlt/45 px-4 py-10 text-center">
+      <div className="inline-flex h-12 w-12 items-center justify-center rounded-card border border-primary/20 bg-primary/10 text-primary">
+        {icon}
+      </div>
+      <p className="mt-4 text-base font-bold text-text">{title}</p>
+      <p className="mt-1 max-w-md text-sm leading-6 text-subtext">{description}</p>
+    </div>
+  );
+}
+
+function SoftStat({ label, value, tone = "text-text" }: { label: string; value: string | number; tone?: string }) {
+  return (
+    <article className="rounded-card border border-line/70 bg-panelAlt/45 px-3 py-2">
+      <p className="text-xs font-bold uppercase tracking-wide text-subtext">{label}</p>
+      <p className={`mt-1 text-xl font-extrabold ${tone}`}>{value}</p>
+    </article>
+  );
+}
 
 function formatHashtags(hashtags?: string[]) {
   return Array.isArray(hashtags) ? hashtags.filter(Boolean).join(" ") : "";
@@ -221,10 +283,14 @@ export function AppHomePage() {
   const [autoPostUseNaturalDelay, setAutoPostUseNaturalDelay] = useState(true);
   const [autoPostSubmitting, setAutoPostSubmitting] = useState(false);
   const [autoPostLastResult, setAutoPostLastResult] = useState<AutoPostPublishResponse | null>(null);
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
+  const [socialAccountsLoaded, setSocialAccountsLoaded] = useState(false);
+  const [socialConnectingPlatform, setSocialConnectingPlatform] = useState<AutoPostPlatform | null>(null);
   const [autoPostPlatforms, setAutoPostPlatforms] = useState({
     facebook: true,
     instagram: true
   });
+  const zernioCallbackRef = useRef("");
   const selectedPlanPrice = useMemo(() => getPlanPriceVnd(selectedUpgradePlan), [selectedUpgradePlan]);
   const transferContent = useMemo(() => {
     const accountCode = (user?.id || "KHACH").replace(/[^a-zA-Z0-9]/g, "").slice(0, 8).toUpperCase();
@@ -240,12 +306,34 @@ export function AppHomePage() {
     [leads]
   );
   const wonCount = useMemo(() => leads.filter((lead) => lead.status === "won").length, [leads]);
+  const customerTasks = useMemo(() => tasks.filter((task) => task.type !== "admin"), [tasks]);
+  const unfinishedTaskCount = useMemo(
+    () => customerTasks.filter((task) => task.status !== "done").length,
+    [customerTasks]
+  );
+  const aiUsagePercent = useMemo(() => {
+    if (!quota.limit) return 0;
+    return Math.min(100, Math.round((quota.used / quota.limit) * 100));
+  }, [quota.limit, quota.used]);
   const enabledAutoPostPlatforms = useMemo(() => {
     const list: string[] = [];
     if (autoPostPlatforms.facebook) list.push("Facebook");
     if (autoPostPlatforms.instagram) list.push("Instagram");
     return list;
   }, [autoPostPlatforms.facebook, autoPostPlatforms.instagram]);
+  const connectedSocialAccountMap = useMemo(() => {
+    const map = new Map<AutoPostPlatform, SocialAccount>();
+    socialAccounts.forEach((account) => {
+      if ((account.platform === "facebook" || account.platform === "instagram") && account.status === "connected") {
+        map.set(account.platform, account);
+      }
+    });
+    return map;
+  }, [socialAccounts]);
+  const hasConnectedSocialAccount = useCallback(
+    (platform: AutoPostPlatform) => connectedSocialAccountMap.has(platform),
+    [connectedSocialAccountMap]
+  );
   const historyPreviewCount = 3;
   const hasMoreHistory = contentHistory.length > historyPreviewCount;
   const visibleHistory = useMemo(
@@ -270,11 +358,12 @@ export function AppHomePage() {
   const reloadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [leadData, taskData, quotaData, historyData] = await Promise.allSettled([
+      const [leadData, taskData, quotaData, historyData, socialData] = await Promise.allSettled([
         appService.getLeads(token),
         appService.getTasks(token),
         appService.getQuota(token),
-        appService.getContentHistory(token, 12)
+        appService.getContentHistory(token, 12),
+        appService.getSocialAccounts(token)
       ]);
 
       if (leadData.status === "fulfilled") {
@@ -293,8 +382,15 @@ export function AppHomePage() {
       if (historyData.status === "fulfilled") {
         setContentHistory(historyData.value.items);
       }
+      if (socialData.status === "fulfilled") {
+        setSocialAccounts(socialData.value.accounts);
+        setSocialAccountsLoaded(true);
+      } else {
+        setSocialAccounts([]);
+        setSocialAccountsLoaded(true);
+      }
 
-      const firstRejected = [leadData, taskData, quotaData, historyData].find(
+      const firstRejected = [leadData, taskData, quotaData, historyData, socialData].find(
         (result) => result.status === "rejected"
       );
       if (firstRejected && firstRejected.status === "rejected") {
@@ -319,6 +415,14 @@ export function AppHomePage() {
   useEffect(() => {
     setUpdateName(user?.name || "");
   }, [user?.name]);
+
+  useEffect(() => {
+    if (!socialAccountsLoaded) return;
+    setAutoPostPlatforms((prev) => ({
+      facebook: hasConnectedSocialAccount("facebook") ? prev.facebook : false,
+      instagram: hasConnectedSocialAccount("instagram") ? prev.instagram : false
+    }));
+  }, [hasConnectedSocialAccount, socialAccountsLoaded]);
 
   useEffect(() => {
     if (!showHeaderMenu) return;
@@ -391,6 +495,72 @@ export function AppHomePage() {
       { replace: true }
     );
   }, [location.pathname, location.search, navigate, notify, user?.plan]);
+
+  useEffect(() => {
+    const query = new URLSearchParams(location.search);
+    const connectedRaw = query.get("connected") || query.get("platform");
+    const errorMessage = query.get("error") || query.get("message");
+    const profileId = query.get("profileId") || query.get("profile_id") || "";
+    const accountId = query.get("accountId") || query.get("account_id") || "";
+    const username = query.get("username") || "";
+    const displayName = query.get("displayName") || query.get("name") || username;
+    const platform = connectedRaw === "facebook" || connectedRaw === "instagram" ? connectedRaw : "";
+    const callbackKey = `${platform}:${profileId}:${accountId}:${errorMessage}`;
+
+    if (!platform && !errorMessage) return;
+    if (zernioCallbackRef.current === callbackKey) return;
+    zernioCallbackRef.current = callbackKey;
+    setActiveTab("autopost");
+
+    const cleanQuery = () => {
+      ["connected", "platform", "profileId", "profile_id", "accountId", "account_id", "username", "displayName", "name", "error", "message"].forEach(
+        (key) => query.delete(key)
+      );
+      const cleanSearch = query.toString();
+      navigate(
+        {
+          pathname: location.pathname,
+          search: cleanSearch ? `?${cleanSearch}` : ""
+        },
+        { replace: true }
+      );
+    };
+
+    if (errorMessage) {
+      notify("Chưa kết nối được tài khoản mạng xã hội. Vui lòng thử lại.", "error");
+      cleanQuery();
+      return;
+    }
+
+    if (!platform || !profileId || !accountId) {
+      notify("Thiếu thông tin kết nối mạng xã hội. Vui lòng thử lại.", "error");
+      cleanQuery();
+      return;
+    }
+
+    appService
+      .completeSocialConnect(token, {
+        platform: platform as AutoPostPlatform,
+        profileId,
+        accountId,
+        username,
+        displayName
+      })
+      .then((data) => {
+        setSocialAccounts((prev) => {
+          const rest = prev.filter((account) => account.platform !== data.account.platform);
+          return [...rest, data.account];
+        });
+        setSocialAccountsLoaded(true);
+        setAutoPostPlatforms((prev) => ({ ...prev, [platform]: true }));
+        notify(`${platform === "facebook" ? "Facebook" : "Instagram"} đã kết nối. Bài đăng sẽ dùng tài khoản này.`, "success");
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : "Không thể lưu kết nối mạng xã hội.";
+        notify(message, "error");
+      })
+      .finally(cleanQuery);
+  }, [location.pathname, location.search, navigate, notify, token]);
 
   const handleCreateLead = async (event: FormEvent) => {
     event.preventDefault();
@@ -601,8 +771,41 @@ export function AppHomePage() {
     }
   };
 
-  const handleToggleAutoPostPlatform = (platform: "facebook" | "instagram") => {
+  const handleToggleAutoPostPlatform = (platform: AutoPostPlatform) => {
+    if (!hasConnectedSocialAccount(platform)) {
+      notify(`Hãy kết nối ${platform === "facebook" ? "Facebook" : "Instagram"} trước khi chọn đăng.`, "info");
+      return;
+    }
     setAutoPostPlatforms((prev) => ({ ...prev, [platform]: !prev[platform] }));
+  };
+
+  const handleConnectSocialPlatform = async (platform: AutoPostPlatform) => {
+    try {
+      setSocialConnectingPlatform(platform);
+      const data = await appService.createSocialConnectUrl(token, platform);
+      window.location.assign(data.authUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Không tạo được link kết nối.";
+      notify(message, "error");
+    } finally {
+      setSocialConnectingPlatform(null);
+    }
+  };
+
+  const handleDisconnectSocialPlatform = async (platform: AutoPostPlatform) => {
+    const confirmed = window.confirm(
+      `Gỡ kết nối ${platform === "facebook" ? "Facebook" : "Instagram"} khỏi tài khoản này?`
+    );
+    if (!confirmed) return;
+    try {
+      await appService.disconnectSocialAccount(token, platform);
+      setSocialAccounts((prev) => prev.filter((account) => account.platform !== platform));
+      setAutoPostPlatforms((prev) => ({ ...prev, [platform]: false }));
+      notify("Đã gỡ kết nối trên ứng dụng.", "success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Không thể gỡ kết nối.";
+      notify(message, "error");
+    }
   };
 
   const handleUseAiResultForPost = () => {
@@ -680,6 +883,18 @@ export function AppHomePage() {
         notify("Vui long chon it nhat mot nen tang.", "error");
         return;
       }
+      const selectedPlatforms: AutoPostPlatform[] = [
+        ...(autoPostPlatforms.facebook ? (["facebook"] as const) : []),
+        ...(autoPostPlatforms.instagram ? (["instagram"] as const) : [])
+      ];
+      const missingConnectedAccounts = selectedPlatforms.filter((platform) => !hasConnectedSocialAccount(platform));
+      if (missingConnectedAccounts.length) {
+        notify(
+          `Hãy kết nối ${missingConnectedAccounts.map((platform) => (platform === "facebook" ? "Facebook" : "Instagram")).join(", ")} trước khi đăng.`,
+          "error"
+        );
+        return;
+      }
       if (!autoPostFiles.length) {
         notify("Vui long tai len it nhat mot anh hoac video.", "error");
         return;
@@ -727,10 +942,7 @@ export function AppHomePage() {
 
       const publishResult = await appService.publishAutoPost(token, {
         caption: autoPostCaption.trim(),
-        platforms: [
-          ...(autoPostPlatforms.facebook ? (["facebook"] as const) : []),
-          ...(autoPostPlatforms.instagram ? (["instagram"] as const) : [])
-        ],
+        platforms: selectedPlatforms,
         mode: autoPostMode,
         scheduleAt: autoPostMode === "schedule" ? new Date(autoPostScheduleAt).toISOString() : undefined,
         timezone: "Asia/Bangkok",
@@ -810,110 +1022,135 @@ export function AppHomePage() {
   };
 
   const tabButtonClass = (tab: TabKey) =>
-    `inline-flex min-h-10 items-center gap-2 rounded-card px-3 text-sm font-semibold transition ${
-      activeTab === tab ? "bg-primary text-white" : "bg-panelAlt text-text hover:bg-panel"
+    `inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 rounded-card px-3.5 text-sm font-bold transition ${
+      activeTab === tab
+        ? "bg-primary text-white shadow-soft"
+        : "border border-line/70 bg-panel/65 text-subtext backdrop-blur-xl hover:border-primary/40 hover:bg-panelAlt/85 hover:text-text"
     }`;
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-[1240px] px-4 py-4">
-      <header className="mb-4 rounded-card border border-line bg-panel p-4 shadow-soft">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-3 rounded-card border border-line/70 bg-panelAlt/70 px-2.5 py-2 shadow-soft">
-              <AppBrand logoClassName="h-10 max-w-[105px] rounded-md" />
-              <div className="h-8 w-px bg-line/80" />
+    <div className="mx-auto min-h-screen w-full max-w-[1180px] px-4 py-5 md:px-5">
+      <header className="mb-3 overflow-visible rounded-card border border-white/10 bg-panel/80 p-2.5 shadow-soft backdrop-blur-xl md:p-3">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr),600px] xl:items-center">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="inline-flex shrink-0 items-center gap-2 rounded-card border border-line/70 bg-panelAlt/55 px-2 py-1.5 shadow-soft backdrop-blur-xl">
+              <AppBrand logoClassName="h-8 max-w-[84px] rounded-md" />
+              <div className="h-6 w-px bg-line/80" />
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-subtext">EMS AI MARKETING SPA</p>
-                <p className="text-xs text-subtext/90">Nền tảng vận hành và marketing cho spa</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-subtext">EMS AI MARKETING SPA</p>
+                <p className="text-[11px] text-subtext/90">Marketing cho spa</p>
               </div>
             </div>
-            <h1 className="text-3xl font-extrabold leading-tight text-text">Xin chào {user?.name}</h1>
-            <p className="text-sm text-subtext">
-              Gói hiện tại: <span className="font-semibold text-text">{planLabel(user?.plan ?? "mien_phi")}</span> · Lượt AI còn
-              lại hôm nay:{" "}
-              <span className="font-semibold text-text">
-                {quota.remaining}/{quota.limit}
-              </span>
-            </p>
+
+            <div className="min-w-0">
+              <p className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-primary">
+                <Sparkles size={12} />
+                Bảng điều khiển hôm nay
+              </p>
+              <h1 className="mt-1 text-2xl font-extrabold leading-tight text-text">Xin chào {user?.name}</h1>
+              <p className="mt-0.5 max-w-[520px] truncate text-xs leading-5 text-subtext">
+                Xem lead, tạo nội dung, theo dõi công việc và chuẩn bị đăng bài.
+              </p>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-card border border-line bg-panelAlt text-text hover:bg-panel"
-              aria-label="Chuyển giao diện"
-            >
-              {theme === "dark" ? <SunMedium size={16} /> : <MoonStar size={16} />}
-            </button>
+          <div className="rounded-card border border-line/70 bg-panelAlt/50 p-1.5 shadow-soft backdrop-blur-xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="w-[180px] shrink-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-sm font-extrabold text-text">Gói {planLabel(user?.plan ?? "mien_phi")}</p>
+                  <Badge tone="success">
+                    Còn {quota.remaining}/{quota.limit}
+                  </Badge>
+                </div>
+                <progress
+                  className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full accent-primary"
+                  value={quota.used}
+                  max={quota.limit || 1}
+                  aria-label="Tỷ lệ sử dụng AI trong ngày"
+                />
+                <span className="sr-only">
+                  Đã dùng {quota.used}/{quota.limit} lượt hôm nay ({aiUsagePercent}%).
+                </span>
+              </div>
 
-            <Button onClick={() => handleOpenUpgrade()} className="min-h-10 px-3">
-              <Crown size={16} />
-              Nâng cấp
-            </Button>
-
-            <div className="relative" ref={headerMenuRef}>
-              <Button
-                variant="secondary"
-                className="min-h-10 px-3"
-                onClick={() => setShowHeaderMenu((prev) => !prev)}
+              <button
+                type="button"
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-card border border-line bg-panel text-text transition hover:bg-panelAlt"
+                aria-label="Chuyển giao diện"
               >
-                <PencilLine size={16} />
-                Tùy chọn
-                <ChevronDown size={14} />
+                {theme === "dark" ? <SunMedium size={15} /> : <MoonStar size={15} />}
+              </button>
+
+              <Button onClick={() => handleOpenUpgrade()} className="!min-h-8 h-8 shrink-0 px-2 text-xs">
+                <Crown size={14} />
+                Nâng cấp
               </Button>
 
-              {showHeaderMenu ? (
-                <div className="absolute right-0 top-[calc(100%+8px)] z-30 w-[220px] rounded-card border border-line bg-panel p-2 shadow-soft">
-                  {user?.role === "admin" ? (
+              <div className="relative shrink-0" ref={headerMenuRef}>
+                <Button
+                  variant="secondary"
+                  className="!min-h-8 h-8 px-2 text-xs"
+                  onClick={() => setShowHeaderMenu((prev) => !prev)}
+                >
+                  <PencilLine size={14} />
+                  Cài đặt
+                  <ChevronDown size={13} />
+                </Button>
+
+                {showHeaderMenu ? (
+                  <div className="absolute right-0 top-[calc(100%+8px)] z-30 w-[220px] rounded-card border border-line bg-panel p-2 shadow-soft">
+                    {user?.role === "admin" ? (
+                      <button
+                        type="button"
+                        className="flex w-full items-center rounded-card px-3 py-2 text-left text-sm font-semibold text-text hover:bg-panelAlt"
+                        onClick={() => {
+                          setShowHeaderMenu(false);
+                          navigate("/admin");
+                        }}
+                      >
+                        Trang Admin
+                      </button>
+                    ) : null}
+
                     <button
                       type="button"
                       className="flex w-full items-center rounded-card px-3 py-2 text-left text-sm font-semibold text-text hover:bg-panelAlt"
                       onClick={() => {
                         setShowHeaderMenu(false);
-                        navigate("/admin");
+                        Promise.all([refreshMe(), reloadData()]).catch(() => undefined);
                       }}
                     >
-                      Trang Admin
+                      Làm mới dữ liệu
                     </button>
-                  ) : null}
 
-                  <button
-                    type="button"
-                    className="flex w-full items-center rounded-card px-3 py-2 text-left text-sm font-semibold text-text hover:bg-panelAlt"
-                    onClick={() => {
-                      setShowHeaderMenu(false);
-                      Promise.all([refreshMe(), reloadData()]).catch(() => undefined);
-                    }}
-                  >
-                    Làm mới dữ liệu
-                  </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center rounded-card px-3 py-2 text-left text-sm font-semibold text-text hover:bg-panelAlt"
+                      onClick={() => {
+                        setShowHeaderMenu(false);
+                        setShowUpdateBox((prev) => !prev);
+                      }}
+                    >
+                      Cập nhật tài khoản
+                    </button>
+                  </div>
+                ) : null}
+              </div>
 
-                  <button
-                    type="button"
-                    className="flex w-full items-center rounded-card px-3 py-2 text-left text-sm font-semibold text-text hover:bg-panelAlt"
-                    onClick={() => {
-                      setShowHeaderMenu(false);
-                      setShowUpdateBox((prev) => !prev);
-                    }}
-                  >
-                    Cập nhật tài khoản
-                  </button>
-                </div>
-              ) : null}
+              <Button
+                variant="danger"
+                className="!min-h-8 h-8 shrink-0 px-2 text-xs"
+                onClick={() => {
+                  logout();
+                  navigate("/login", { replace: true });
+                }}
+              >
+                <LogOut size={14} />
+                <span>Thoát</span>
+              </Button>
             </div>
-
-            <Button
-              variant="danger"
-              className="min-h-10 px-3"
-              onClick={() => {
-                logout();
-                navigate("/login", { replace: true });
-              }}
-            >
-              <LogOut size={16} />
-              <span className="hidden sm:inline">Đăng xuất</span>
-            </Button>
           </div>
         </div>
       </header>
@@ -966,7 +1203,7 @@ export function AppHomePage() {
         </Card>
       ) : null}
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap gap-2 rounded-card border border-white/10 bg-panel/70 p-2 shadow-soft backdrop-blur-xl">
         <button className={tabButtonClass("overview")} type="button" onClick={() => setActiveTab("overview")}>
           <LayoutDashboard size={16} />
           Tổng quan
@@ -990,163 +1227,224 @@ export function AppHomePage() {
       </div>
 
       {activeTab === "overview" ? (
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <p className="text-sm font-semibold text-subtext">Lead đang mở</p>
-            <p className="mt-2 text-3xl font-extrabold text-text">{openCount}</p>
-          </Card>
-          <Card>
-            <p className="text-sm font-semibold text-subtext">Lead đã chốt</p>
-            <p className="mt-2 text-3xl font-extrabold text-text">{wonCount}</p>
-          </Card>
-          <Card>
-            <p className="text-sm font-semibold text-subtext">Task chưa hoàn thành</p>
-            <p className="mt-2 text-3xl font-extrabold text-text">
-              {tasks.filter((task) => task.status !== "done").length}
-            </p>
-          </Card>
-          <Card className="md:col-span-3">
-            <h2 className="text-lg font-bold text-text">Menu chào khách và thao tác nhanh</h2>
-            <p className="mt-2 text-sm text-subtext">
-              Mẫu lời chào: "Spa cảm ơn chị đã nhắn tin. Em gửi ngay gói phù hợp và lịch trong hôm nay để chị chọn nhanh ạ."
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button onClick={() => setActiveTab("content")}>Tạo nội dung ngay</Button>
-              <Button variant="secondary" onClick={() => copyText(contentResult.replyTemplate || "Mẫu phản hồi chưa có.")}>
-                <Copy size={16} />
-                Sao chép mẫu phản hồi
-              </Button>
-              <Button variant="secondary" onClick={() => setActiveTab("leads")}>
-                Cập nhật lead
-              </Button>
-              <Button variant="secondary" onClick={() => setActiveTab("autopost")}>
-                Mở đăng tự động
-              </Button>
+        <div className="grid gap-4">
+          <Card className="bg-panel/82">
+            <div className="grid gap-4 lg:grid-cols-[1fr,2fr] lg:items-center">
+              <PanelHeader
+                icon={<LayoutDashboard size={18} />}
+                title="Tổng quan hôm nay"
+                description="Nhìn nhanh tình hình khách, nội dung và công việc trong ngày."
+              />
+              <div className="grid gap-3 sm:grid-cols-3">
+                <SoftStat label="Lead đang mở" value={openCount} />
+                <SoftStat label="Đã chốt" value={wonCount} tone="text-success" />
+                <SoftStat label="Việc còn lại" value={unfinishedTaskCount} tone="text-warning" />
+              </div>
             </div>
           </Card>
+
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr),minmax(280px,0.75fr)]">
+            <Card className="bg-panel/82">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <PanelHeader
+                  icon={<MessageSquareText size={18} />}
+                  title="Menu chào khách"
+                  description="Mẫu câu và thao tác nhanh để phản hồi khách mới trong vài giây."
+                  action={<Badge tone="success">Sẵn sàng</Badge>}
+                />
+              </div>
+              <p className="mt-4 rounded-card border border-line/70 bg-panelAlt/45 p-3 text-sm leading-6 text-subtext">
+                "Spa cảm ơn chị đã nhắn tin. Em gửi ngay gói phù hợp và lịch trong hôm nay để chị chọn nhanh ạ."
+              </p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                <Button onClick={() => setActiveTab("content")} className="w-full">
+                  <Sparkles size={16} />
+                  Tạo nội dung
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  onClick={() => copyText(contentResult.replyTemplate || "Mẫu phản hồi chưa có.")}
+                >
+                  <Copy size={16} />
+                  Sao chép
+                </Button>
+                <Button variant="secondary" className="w-full" onClick={() => setActiveTab("leads")}>
+                  Cập nhật lead
+                </Button>
+                <Button variant="secondary" className="w-full" onClick={() => setActiveTab("autopost")}>
+                  Đăng bài
+                </Button>
+              </div>
+            </Card>
+
+            <Card className="bg-panel/82">
+              <PanelHeader
+                icon={<Crown size={18} />}
+                title="Tài nguyên"
+                description={`Gói ${planLabel(user?.plan ?? "mien_phi")} còn ${quota.remaining} lượt tạo nội dung.`}
+              />
+              <div className="mt-4 grid gap-2">
+                <Button onClick={() => handleOpenUpgrade()} className="w-full">
+                  <Crown size={16} />
+                  Xem gói nâng cấp
+                </Button>
+                <Button variant="secondary" onClick={() => reloadData()} className="w-full">
+                  Làm mới dữ liệu
+                </Button>
+              </div>
+            </Card>
+          </div>
         </div>
       ) : null}
 
       {activeTab === "content" ? (
-        <div className="grid gap-4 xl:grid-cols-[1.05fr,0.95fr]">
-          <Card>
-            <form className="grid gap-3" onSubmit={handleGenerateContent}>
-              <div>
-                <h2 className="text-lg font-bold text-text">Tạo nội dung cho spa</h2>
-                <p className="text-sm text-subtext">Điền vài thông tin, hệ thống sẽ gợi ý bài viết để bạn đăng ngay.</p>
+        <div className="grid items-start gap-4 xl:grid-cols-[0.98fr,1.02fr]">
+          <Card className="bg-panel/86">
+            <form className="grid gap-4" onSubmit={handleGenerateContent}>
+              <PanelHeader
+                icon={<WandSparkles size={18} />}
+                title="Tạo nội dung cho spa"
+                description="Điền vài ý chính, hệ thống sẽ gợi ý bài đăng có tiêu đề, lời mời và mẫu trả lời khách."
+              />
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <SelectField
+                  label="Bạn đăng ở đâu?"
+                  value={contentForm.channel}
+                  onChange={(event) => setContentForm((prev) => ({ ...prev, channel: event.target.value }))}
+                  hint="Chọn kênh bạn muốn đăng bài."
+                >
+                  <option value="facebook">Facebook</option>
+                  <option value="instagram">Instagram</option>
+                </SelectField>
+                <SelectField
+                  label="Cách viết"
+                  value={contentForm.tone}
+                  onChange={(event) => setContentForm((prev) => ({ ...prev, tone: event.target.value }))}
+                  hint="Chọn kiểu bài hợp với thương hiệu của spa."
+                >
+                  <option value="friendly">Gần gũi, dễ chốt lịch</option>
+                  <option value="premium">Cao cấp, tinh tế</option>
+                  <option value="storytelling">Kể chuyện, chạm cảm xúc</option>
+                  <option value="playful">Tươi vui, thu hút</option>
+                  <option value="expert">Chuyên gia, đáng tin</option>
+                </SelectField>
               </div>
-              <SelectField
-                label="Bạn đăng ở đâu?"
-                value={contentForm.channel}
-                onChange={(event) => setContentForm((prev) => ({ ...prev, channel: event.target.value }))}
-              >
-                <option value="facebook">Facebook</option>
-                <option value="instagram">Instagram</option>
-              </SelectField>
-              <SelectField
-                label="Cách viết"
-                value={contentForm.tone}
-                onChange={(event) => setContentForm((prev) => ({ ...prev, tone: event.target.value }))}
-                hint="Chọn kiểu bài hợp với thương hiệu của spa."
-              >
-                <option value="friendly">Gần gũi, dễ chốt lịch</option>
-                <option value="premium">Cao cấp, tinh tế</option>
-                <option value="storytelling">Kể chuyện, chạm cảm xúc</option>
-                <option value="playful">Tươi vui, thu hút</option>
-                <option value="expert">Chuyên gia, đáng tin</option>
-              </SelectField>
-              <InputField
-                label="Bạn muốn đạt điều gì?"
-                value={contentForm.goal}
-                onChange={(event) => setContentForm((prev) => ({ ...prev, goal: event.target.value }))}
-              />
-              <InputField
-                label="Khách hàng bạn muốn nhắm tới"
-                value={contentForm.audience}
-                onChange={(event) => setContentForm((prev) => ({ ...prev, audience: event.target.value }))}
-              />
-              <InputField
-                label="Dịch vụ bạn muốn giới thiệu"
-                value={contentForm.productOrService}
-                onChange={(event) => setContentForm((prev) => ({ ...prev, productOrService: event.target.value }))}
-              />
-              <TextAreaField
-                label="Thông tin thêm (không bắt buộc)"
-                value={contentForm.specialNote}
-                onChange={(event) => setContentForm((prev) => ({ ...prev, specialNote: event.target.value }))}
-              />
-              <Button type="submit" disabled={isGeneratingContent || loading}>
-                {isGeneratingContent ? "Đang tạo..." : "Tạo nội dung"}
-              </Button>
-              <Button type="button" variant="secondary" onClick={handleUseAiResultForPost}>
-                Dùng nội dung này để đăng tự động
-              </Button>
+
+              <div className="grid gap-3 rounded-card border border-line/70 bg-panelAlt/35 p-3">
+                <InputField
+                  label="Bạn muốn đạt điều gì?"
+                  value={contentForm.goal}
+                  onChange={(event) => setContentForm((prev) => ({ ...prev, goal: event.target.value }))}
+                />
+                <InputField
+                  label="Khách hàng bạn muốn nhắm tới"
+                  value={contentForm.audience}
+                  onChange={(event) => setContentForm((prev) => ({ ...prev, audience: event.target.value }))}
+                />
+                <InputField
+                  label="Dịch vụ bạn muốn giới thiệu"
+                  value={contentForm.productOrService}
+                  onChange={(event) => setContentForm((prev) => ({ ...prev, productOrService: event.target.value }))}
+                />
+                <TextAreaField
+                  label="Thông tin thêm"
+                  hint="Ưu đãi, số điện thoại, khu vực hoặc điều bạn muốn nhấn mạnh."
+                  value={contentForm.specialNote}
+                  onChange={(event) => setContentForm((prev) => ({ ...prev, specialNote: event.target.value }))}
+                  className="min-h-32"
+                />
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-[1fr,auto]">
+                <Button type="submit" disabled={isGeneratingContent || loading}>
+                  <Sparkles size={16} />
+                  {isGeneratingContent ? "Đang tạo..." : "Tạo nội dung"}
+                </Button>
+                <Button type="button" variant="secondary" onClick={handleUseAiResultForPost}>
+                  <SendHorizontal size={16} />
+                  Dùng để đăng
+                </Button>
+              </div>
             </form>
           </Card>
 
-          <Card className="grid gap-3">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-lg font-bold text-text">Bài gợi ý</h3>
-              <Badge tone="neutral">
-                Hôm nay còn {quota.remaining}/{quota.limit} lượt
-              </Badge>
+          <Card className="grid gap-3 bg-panel/86">
+            <PanelHeader
+              icon={<FileText size={18} />}
+              title="Bài gợi ý"
+              description="Xem nhanh nội dung vừa tạo và dùng lại các bài đã lưu."
+              action={<Badge tone="neutral">Còn {quota.remaining}/{quota.limit} lượt</Badge>}
+            />
+
+            <div className="grid gap-3">
+              <article className="rounded-card border border-primary/15 bg-primary/10 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-primary">Tiêu đề bài viết</p>
+                <p className="mt-2 text-base font-bold leading-7 text-text">
+                  {contentResult.headline || "Chưa có nội dung. Bấm \"Tạo nội dung\" để bắt đầu."}
+                </p>
+              </article>
+              <article className="rounded-card border border-line/70 bg-panelAlt/45 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-subtext">Nội dung bài đăng</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-text">
+                  {contentResult.body || "Chưa có nội dung. Bấm \"Tạo nội dung\" để bắt đầu."}
+                </p>
+              </article>
+              <div className="grid gap-3 md:grid-cols-2">
+                <article className="rounded-card border border-line/70 bg-panelAlt/45 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-subtext">Lời mời khách</p>
+                  <p className="mt-2 text-sm leading-6 text-text">
+                    {contentResult.cta || "Chưa có nội dung. Bấm \"Tạo nội dung\" để bắt đầu."}
+                  </p>
+                </article>
+                <article className="rounded-card border border-line/70 bg-panelAlt/45 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-subtext">Mẫu trả lời khách</p>
+                  <p className="mt-2 text-sm leading-6 text-text">
+                    {contentResult.replyTemplate || "Chưa có nội dung. Bấm \"Tạo nội dung\" để bắt đầu."}
+                  </p>
+                </article>
+              </div>
+              <article className="rounded-card border border-line/70 bg-panelAlt/45 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-subtext">Hashtag gợi ý</p>
+                {contentResult.hashtags?.length ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {contentResult.hashtags.map((hashtag) => (
+                      <Badge key={hashtag} tone="success">
+                        {hashtag}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-subtext">Chưa có hashtag. Tạo nội dung để hệ thống gợi ý.</p>
+                )}
+              </article>
             </div>
-            <article className="rounded-card border border-line bg-panelAlt p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-subtext">Tiêu đề bài viết</p>
-              <p className="mt-1 text-sm text-text">{contentResult.headline || "Chưa có nội dung. Bấm \"Tạo nội dung\" để bắt đầu."}</p>
-            </article>
-            <article className="rounded-card border border-line bg-panelAlt p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-subtext">Nội dung bài đăng</p>
-              <p className="mt-1 text-sm text-text">{contentResult.body || "Chưa có nội dung. Bấm \"Tạo nội dung\" để bắt đầu."}</p>
-            </article>
-            <article className="rounded-card border border-line bg-panelAlt p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-subtext">Lời mời khách hành động</p>
-              <p className="mt-1 text-sm text-text">{contentResult.cta || "Chưa có nội dung. Bấm \"Tạo nội dung\" để bắt đầu."}</p>
-            </article>
-            <article className="rounded-card border border-line bg-panelAlt p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-subtext">Hashtag gợi ý</p>
-              {contentResult.hashtags?.length ? (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {contentResult.hashtags.map((hashtag) => (
-                    <Badge key={hashtag} tone="success">
-                      {hashtag}
-                    </Badge>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-1 text-sm text-text">Chưa có hashtag. Bấm "Tạo nội dung" để bắt đầu.</p>
-              )}
-            </article>
-            <article className="rounded-card border border-line bg-panelAlt p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-subtext">Mẫu trả lời khách</p>
-              <p className="mt-1 text-sm text-text">{contentResult.replyTemplate || "Chưa có nội dung. Bấm \"Tạo nội dung\" để bắt đầu."}</p>
-            </article>
-            <article className="rounded-card border border-line bg-panelAlt p-3">
-              <div className="flex items-center justify-between gap-2">
+
+            <article className="rounded-card border border-line/70 bg-panelAlt/35 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="inline-flex items-center gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-subtext">Lịch sử nội dung AI</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-subtext">Lịch sử nội dung</p>
                   <Badge tone="neutral">{contentHistory.length} mục</Badge>
                 </div>
                 {hasMoreHistory ? (
-                  <Button
-                    className="min-h-8 px-3 text-xs"
-                    variant="ghost"
-                    onClick={() => setShowAllHistory((prev) => !prev)}
-                  >
+                  <Button className="min-h-8 px-3 text-xs" variant="ghost" onClick={() => setShowAllHistory((prev) => !prev)}>
                     {showAllHistory ? "Thu gọn" : `Xem thêm ${contentHistory.length - historyPreviewCount} mục`}
                   </Button>
                 ) : null}
               </div>
               {contentHistory.length === 0 ? (
-                <p className="mt-2 text-sm text-subtext">Chưa có nội dung đã lưu. Tạo nội dung đầu tiên để bắt đầu lịch sử.</p>
+                <p className="mt-2 text-sm text-subtext">Chưa có nội dung đã lưu. Tạo bài đầu tiên để bắt đầu lịch sử.</p>
               ) : (
-                <div className="mt-2 grid max-h-[320px] gap-2 overflow-y-auto overflow-x-hidden pr-1">
+                <div className="mt-3 grid max-h-[300px] gap-2 overflow-y-auto overflow-x-hidden pr-1">
                   {visibleHistory.map((item) => (
-                    <div key={item._id} className="min-w-0 max-w-full overflow-hidden rounded-card border border-line/70 bg-panel px-3 py-2">
+                    <div key={item._id} className="min-w-0 max-w-full overflow-hidden rounded-card border border-line/70 bg-panel/80 px-3 py-2">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="min-w-0 max-w-full truncate text-sm font-semibold text-text sm:max-w-[70%]">{item.headline || "Nội dung không tiêu đề"}</p>
+                        <p className="min-w-0 max-w-full truncate text-sm font-semibold text-text sm:max-w-[70%]">
+                          {item.headline || "Nội dung không tiêu đề"}
+                        </p>
                         <div className="inline-flex items-center gap-2">
-                          {item.isFallback ? <Badge tone="warning">Bản nháp</Badge> : <Badge tone="success">AI</Badge>}
+                          {item.isFallback ? <Badge tone="warning">Bản nháp</Badge> : <Badge tone="success">Đã tạo</Badge>}
                           <span className="text-xs text-subtext">{formatHistoryTime(item.createdAt)}</span>
                         </div>
                       </div>
@@ -1158,6 +1456,7 @@ export function AppHomePage() {
                           Dùng lại
                         </Button>
                         <Button className="min-h-8 px-3 text-xs" variant="ghost" onClick={() => copyHistoryItem(item)}>
+                          <Copy size={14} />
                           Sao chép
                         </Button>
                       </div>
@@ -1171,325 +1470,498 @@ export function AppHomePage() {
       ) : null}
 
       {activeTab === "leads" ? (
-        <div className="grid gap-4 xl:grid-cols-[0.95fr,1.05fr]">
-          <Card>
-            <form className="grid gap-3" onSubmit={handleCreateLead}>
-              <h2 className="text-lg font-bold text-text">Thêm lead mới</h2>
-              <InputField label="Tên khách / doanh nghiệp" value={leadName} onChange={(event) => setLeadName(event.target.value)} required />
-              <InputField label="Nguồn" value={leadSource} onChange={(event) => setLeadSource(event.target.value)} />
-              <InputField label="Liên hệ" value={leadContact} onChange={(event) => setLeadContact(event.target.value)} />
-              <TextAreaField label="Ghi chú" value={leadNote} onChange={(event) => setLeadNote(event.target.value)} />
-              <Button type="submit">Lưu lead</Button>
+        <div className="grid items-start gap-4 xl:grid-cols-[0.9fr,1.1fr]">
+          <Card className="bg-panel/86">
+            <form className="grid gap-4" onSubmit={handleCreateLead}>
+              <PanelHeader
+                icon={<UserPlus size={18} />}
+                title="Thêm khách tiềm năng"
+                description="Lưu thông tin khách để đội spa theo dõi tư vấn và chốt lịch dễ hơn."
+              />
+              <div className="grid gap-3 rounded-card border border-line/70 bg-panelAlt/35 p-3">
+                <InputField
+                  label="Tên khách"
+                  value={leadName}
+                  onChange={(event) => setLeadName(event.target.value)}
+                  required
+                />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <InputField label="Nguồn khách" value={leadSource} onChange={(event) => setLeadSource(event.target.value)} />
+                  <InputField label="Số điện thoại hoặc inbox" value={leadContact} onChange={(event) => setLeadContact(event.target.value)} />
+                </div>
+                <TextAreaField
+                  label="Ghi chú tư vấn"
+                  value={leadNote}
+                  onChange={(event) => setLeadNote(event.target.value)}
+                  className="min-h-32"
+                />
+              </div>
+              <Button type="submit">
+                <UserPlus size={16} />
+                Lưu khách
+              </Button>
             </form>
           </Card>
-          <Card className="grid gap-3">
-            <h2 className="text-lg font-bold text-text">Danh sách lead</h2>
-            {leads.map((lead) => {
-              const leadId = String(lead._id || lead.id || "");
-              return (
-                <article key={leadId} className="grid gap-2 rounded-card border border-line bg-panelAlt p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-semibold text-text">{lead.name}</p>
-                    <SelectField
-                      label="Trạng thái"
-                      value={lead.status}
-                      onChange={(event) => handleLeadStatus(leadId, event.target.value)}
+
+          <Card className="grid gap-3 bg-panel/86">
+            <PanelHeader
+              icon={<UsersRound size={18} />}
+              title="Danh sách lead"
+              description="Theo dõi trạng thái từng khách, tránh bỏ sót người đang quan tâm."
+              action={<Badge tone="neutral">{leads.length} lead</Badge>}
+            />
+
+            {leads.length === 0 ? (
+              <EmptyState
+                icon={<UsersRound size={20} />}
+                title="Chưa có lead nào"
+                description="Khi có khách nhắn tin hoặc để lại thông tin, hãy thêm vào đây để chăm sóc tiếp."
+              />
+            ) : (
+              <div className="grid max-h-[560px] gap-3 overflow-y-auto pr-1">
+                {leads.map((lead) => {
+                  const leadId = String(lead._id || lead.id || "");
+                  const currentStatus = leadStatusOptions.find((status) => status.id === lead.status)?.label || "Đang theo dõi";
+                  return (
+                    <article
+                      key={leadId}
+                      className="grid gap-3 rounded-card border border-line/70 bg-panelAlt/45 p-3 transition hover:border-primary/35 hover:bg-panelAlt/65"
                     >
-                      {leadStatusOptions.map((status) => (
-                        <option key={status.id} value={status.id}>
-                          {status.label}
-                        </option>
-                      ))}
-                    </SelectField>
-                  </div>
-                  <p className="text-xs text-subtext">
-                    {lead.source} · {lead.contact || "Chưa có liên hệ"}
-                  </p>
-                  <p className="text-sm text-subtext">{lead.note || "Chưa có ghi chú"}</p>
-                </article>
-              );
-            })}
+                      <div className="grid gap-3 md:grid-cols-[1fr,210px] md:items-start">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-base font-extrabold text-text">{lead.name}</p>
+                            <Badge tone="success">{currentStatus}</Badge>
+                          </div>
+                          <p className="mt-2 text-sm text-subtext">
+                            {lead.source} · {lead.contact || "Chưa có liên hệ"}
+                          </p>
+                        </div>
+                        <SelectField
+                          label="Trạng thái"
+                          value={lead.status}
+                          onChange={(event) => handleLeadStatus(leadId, event.target.value)}
+                        >
+                          {leadStatusOptions.map((status) => (
+                            <option key={status.id} value={status.id}>
+                              {status.label}
+                            </option>
+                          ))}
+                        </SelectField>
+                      </div>
+                      <p className="rounded-card border border-line/60 bg-panel/65 px-3 py-2 text-sm leading-6 text-subtext">
+                        {lead.note || "Chưa có ghi chú tư vấn."}
+                      </p>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </Card>
         </div>
       ) : null}
 
       {activeTab === "tasks" ? (
-        <div className="grid gap-4 xl:grid-cols-[0.95fr,1.05fr]">
-          <Card>
-            <form className="grid gap-3" onSubmit={handleCreateTask}>
-              <h2 className="text-lg font-bold text-text">Tạo công việc mới</h2>
-              <InputField label="Tiêu đề" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} required />
-              <TextAreaField label="Mô tả" value={taskDescription} onChange={(event) => setTaskDescription(event.target.value)} />
-              <SelectField label="Loại task" value={taskType} onChange={(event) => setTaskType(event.target.value)}>
-                <option value="marketing">Marketing</option>
-                <option value="follow_up">Follow-up</option>
-                <option value="booking">Đặt lịch</option>
-              </SelectField>
-              <InputField
-                label="Hạn hoàn thành"
-                type="date"
-                value={taskDueAt}
-                onChange={(event) => setTaskDueAt(event.target.value)}
+        <div className="grid items-start gap-4 xl:grid-cols-[0.9fr,1.1fr]">
+          <Card className="bg-panel/86">
+            <form className="grid gap-4" onSubmit={handleCreateTask}>
+              <PanelHeader
+                icon={<ClipboardList size={18} />}
+                title="Tạo công việc mới"
+                description="Ghi lại việc cần xử lý trong ngày để không bỏ sót lead, nội dung hoặc lịch hẹn."
               />
+              <div className="grid gap-3 rounded-card border border-line/70 bg-panelAlt/35 p-3">
+                <InputField label="Tên việc cần làm" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} required />
+                <TextAreaField
+                  label="Mô tả ngắn"
+                  value={taskDescription}
+                  onChange={(event) => setTaskDescription(event.target.value)}
+                  className="min-h-32"
+                />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <SelectField label="Nhóm công việc" value={taskType} onChange={(event) => setTaskType(event.target.value)}>
+                    <option value="marketing">Marketing</option>
+                    <option value="follow_up">Chăm sóc khách</option>
+                    <option value="booking">Đặt lịch</option>
+                  </SelectField>
+                  <InputField
+                    label="Hạn hoàn thành"
+                    type="date"
+                    value={taskDueAt}
+                    onChange={(event) => setTaskDueAt(event.target.value)}
+                  />
+                </div>
+              </div>
               <Button type="submit">
-                <MessageSquareText size={16} />
-                Tạo task
+                <ListChecks size={16} />
+                Tạo công việc
               </Button>
             </form>
           </Card>
 
-          <Card className="grid gap-3">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-lg font-bold text-text">Danh sách công việc</h2>
-              <Badge tone="neutral">{tasks.length} task</Badge>
-            </div>
+          <Card className="grid gap-3 bg-panel/86">
+            <PanelHeader
+              icon={<ListChecks size={18} />}
+              title="Danh sách công việc"
+              description="Chỉ hiển thị công việc của khách hàng. Task quản trị được tách riêng trong trang Admin."
+              action={<Badge tone="neutral">{customerTasks.length} việc</Badge>}
+            />
 
-            {tasks.map((task) => {
-              const isDone = task.status === "done";
-              const isPendingAction = pendingTaskAction?.taskId === task._id;
-              const isLoadingAction = taskActionLoadingId === task._id;
+            {customerTasks.length === 0 ? (
+              <EmptyState
+                icon={<ClipboardList size={20} />}
+                title="Chưa có công việc nào"
+                description="Tạo việc đầu tiên ở khung bên trái để theo dõi những việc cần làm trong ngày."
+              />
+            ) : (
+              <div className="grid max-h-[620px] gap-3 overflow-y-auto pr-1">
+                {customerTasks.map((task) => {
+                  const isDone = task.status === "done";
+                  const isPendingAction = pendingTaskAction?.taskId === task._id;
+                  const isLoadingAction = taskActionLoadingId === task._id;
 
-              const statusLabel =
-                task.status === "done" ? "Hoàn thành" : task.status === "in_progress" ? "Đang làm" : "Cần làm";
-              const statusTone = task.status === "done" ? "success" : task.status === "todo" ? "warning" : "neutral";
-              const taskTypeLabel =
-                task.type === "follow_up"
-                  ? "Chăm sóc khách"
-                  : task.type === "booking"
-                    ? "Đặt lịch"
-                    : task.type === "admin"
-                      ? "Quản trị"
-                      : "Marketing";
+                  const statusLabel =
+                    task.status === "done" ? "Hoàn thành" : task.status === "in_progress" ? "Đang làm" : "Cần làm";
+                  const statusTone = task.status === "done" ? "success" : task.status === "todo" ? "warning" : "neutral";
+                  const taskTypeLabel =
+                    task.type === "follow_up"
+                      ? "Chăm sóc khách"
+                      : task.type === "booking"
+                        ? "Đặt lịch"
+                        : task.type === "admin"
+                          ? "Quản trị"
+                          : "Marketing";
 
-              return (
-                <article
-                  key={task._id}
-                  className="grid gap-3 rounded-card border border-line bg-panelAlt p-4 shadow-soft transition hover:border-primary/40"
-                >
-                  <div className="grid gap-3 md:grid-cols-[1fr,220px] md:items-start">
-                    <div className="space-y-2">
-                      <p className="text-base font-bold leading-tight text-text">{task.title}</p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge tone={statusTone}>{statusLabel}</Badge>
-                        <Badge tone="neutral">{taskTypeLabel}</Badge>
-                        {task.dueAt ? <p className="text-xs text-subtext">Hạn: {task.dueAt}</p> : null}
-                      </div>
-                    </div>
-
-                    <SelectField
-                      label="Trạng thái"
-                      value={task.status}
-                      onChange={(event) => handleTaskStatus(task._id, event.target.value)}
+                  return (
+                    <article
+                      key={task._id}
+                      className="grid gap-3 rounded-card border border-line/70 bg-panelAlt/45 p-3 transition hover:border-primary/35 hover:bg-panelAlt/65"
                     >
-                      {taskStatusOptions.map((status) => (
-                        <option key={status.id} value={status.id}>
-                          {status.label}
-                        </option>
-                      ))}
-                    </SelectField>
-                  </div>
+                      <div className="grid gap-3 md:grid-cols-[1fr,210px] md:items-start">
+                        <div className="space-y-2">
+                          <p className="text-base font-extrabold leading-tight text-text">{task.title}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge tone={statusTone}>{statusLabel}</Badge>
+                            <Badge tone="neutral">{taskTypeLabel}</Badge>
+                            {task.dueAt ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-subtext">
+                                <CalendarDays size={13} />
+                                {task.dueAt}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
 
-                  <p className="text-sm leading-relaxed text-subtext">{task.description || "Không có mô tả."}</p>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="secondary"
-                      className="min-h-10 px-3 text-sm"
-                      disabled={isDone || isLoadingAction}
-                      onClick={() => setPendingTaskAction({ taskId: task._id, action: "done" })}
-                    >
-                      <CheckCircle2 size={14} className="text-emerald-400" />
-                      Đánh dấu hoàn thành
-                    </Button>
-                    <Button
-                      variant="danger"
-                      className="min-h-10 px-3 text-sm"
-                      disabled={isLoadingAction}
-                      onClick={() => setPendingTaskAction({ taskId: task._id, action: "delete" })}
-                    >
-                      <Trash2 size={14} />
-                      Xóa task
-                    </Button>
-                  </div>
-
-                  {isPendingAction ? (
-                    <div className="rounded-card border border-primary/30 bg-panel p-3">
-                      <p className="text-sm text-subtext">
-                        {pendingTaskAction.action === "done"
-                          ? "Xác nhận đánh dấu task này là hoàn thành?"
-                          : "Xác nhận xóa task này? Hành động này không thể hoàn tác."}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Button
-                          className="min-h-10 px-3 text-sm"
-                          disabled={isLoadingAction}
-                          onClick={() =>
-                            pendingTaskAction.action === "done"
-                              ? handleCompleteTask(task._id)
-                              : handleDeleteTask(task._id)
-                          }
+                        <SelectField
+                          label="Trạng thái"
+                          value={task.status}
+                          onChange={(event) => handleTaskStatus(task._id, event.target.value)}
                         >
-                          {isLoadingAction ? "Đang xử lý..." : "Xác nhận"}
-                        </Button>
+                          {taskStatusOptions.map((status) => (
+                            <option key={status.id} value={status.id}>
+                              {status.label}
+                            </option>
+                          ))}
+                        </SelectField>
+                      </div>
+
+                      <p className="rounded-card border border-line/60 bg-panel/65 px-3 py-2 text-sm leading-6 text-subtext">
+                        {task.description || "Không có mô tả."}
+                      </p>
+
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           variant="secondary"
                           className="min-h-10 px-3 text-sm"
-                          disabled={isLoadingAction}
-                          onClick={() => setPendingTaskAction(null)}
+                          disabled={isDone || isLoadingAction}
+                          onClick={() => setPendingTaskAction({ taskId: task._id, action: "done" })}
                         >
-                          Hủy
+                          <CheckCircle2 size={14} className="text-success" />
+                          Hoàn thành
+                        </Button>
+                        <Button
+                          variant="danger"
+                          className="min-h-10 px-3 text-sm"
+                          disabled={isLoadingAction}
+                          onClick={() => setPendingTaskAction({ taskId: task._id, action: "delete" })}
+                        >
+                          <Trash2 size={14} />
+                          Xóa
                         </Button>
                       </div>
-                    </div>
-                  ) : null}
-                </article>
-              );
-            })}
 
-            {tasks.length === 0 ? (
-              <p className="rounded-card border border-dashed border-line bg-panelAlt p-3 text-sm text-subtext">
-                Chưa có công việc nào. Hãy tạo task đầu tiên ở khung bên trái.
-              </p>
-            ) : null}
+                      {isPendingAction ? (
+                        <div className="rounded-card border border-primary/25 bg-primary/10 p-3">
+                          <p className="text-sm text-subtext">
+                            {pendingTaskAction.action === "done"
+                              ? "Xác nhận công việc này đã hoàn thành?"
+                              : "Xác nhận xóa công việc này? Sau khi xóa sẽ không thể khôi phục."}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Button
+                              className="min-h-10 px-3 text-sm"
+                              disabled={isLoadingAction}
+                              onClick={() =>
+                                pendingTaskAction.action === "done" ? handleCompleteTask(task._id) : handleDeleteTask(task._id)
+                              }
+                            >
+                              {isLoadingAction ? "Đang xử lý..." : "Xác nhận"}
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              className="min-h-10 px-3 text-sm"
+                              disabled={isLoadingAction}
+                              onClick={() => setPendingTaskAction(null)}
+                            >
+                              Hủy
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </Card>
         </div>
       ) : null}
 
       {activeTab === "autopost" ? (
-        <div className="grid gap-4 xl:grid-cols-[1.02fr,0.98fr]">
-          <Card>
-            <form className="grid gap-3" onSubmit={handleAutoPostSubmit}>
-              <div>
-                <h2 className="text-lg font-bold text-text">Đăng bài tự động</h2>
-                <p className="text-sm text-subtext">Tải ảnh/video, nhập nội dung rồi chọn đăng ngay hoặc hẹn giờ.</p>
-              </div>
+        <div className="grid items-start gap-4 xl:grid-cols-[0.98fr,1.02fr]">
+          <Card className="bg-panel/86">
+            <form className="grid gap-4" onSubmit={handleAutoPostSubmit}>
+              <PanelHeader
+                icon={<Megaphone size={18} />}
+                title="Đăng bài tự động"
+                description="Chọn nền tảng, tải ảnh hoặc video, nhập caption rồi đăng ngay hoặc hẹn giờ."
+              />
 
-              <article className="rounded-card border border-warning/35 bg-warning/10 p-3">
-                <p className="text-sm font-semibold text-text">Lưu ý trước khi dùng</p>
-                <p className="mt-1 text-xs text-subtext">Facebook chỉ đăng vào Page đã kết nối.</p>
-                <p className="mt-1 text-xs text-subtext">Instagram cần tài khoản Business hoặc Creator đã liên kết.</p>
-                <p className="mt-1 text-xs text-subtext">Nếu một nền tảng lỗi, hệ thống vẫn đăng nền tảng còn lại.</p>
+              <article className="rounded-card border border-warning/25 bg-warning/10 p-3">
+                <p className="inline-flex items-center gap-2 text-sm font-bold text-text">
+                  <AlertCircle size={16} className="text-warning" />
+                  Lưu ý trước khi dùng
+                </p>
+                <div className="mt-2 grid gap-1 text-xs leading-5 text-subtext">
+                  <p>Bài đăng chỉ đi qua tài khoản mà khách hàng đã tự kết nối trong mục này.</p>
+                  <p>Facebook chỉ đăng vào Page đã kết nối, không đăng vào trang cá nhân.</p>
+                  <p>Instagram cần tài khoản Business hoặc Creator đã liên kết.</p>
+                  <p>Nếu một nền tảng lỗi, hệ thống vẫn xử lý nền tảng còn lại.</p>
+                </div>
               </article>
 
-              <div className="grid gap-2">
-                <p className="text-sm font-semibold text-text">Nền tảng đăng</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant={autoPostPlatforms.facebook ? "primary" : "secondary"}
-                    className="min-h-10 px-3"
-                    onClick={() => handleToggleAutoPostPlatform("facebook")}
-                  >
-                    Facebook
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={autoPostPlatforms.instagram ? "primary" : "secondary"}
-                    className="min-h-10 px-3"
-                    onClick={() => handleToggleAutoPostPlatform("instagram")}
-                  >
-                    Instagram
-                  </Button>
+              <div className="grid gap-3 rounded-card border border-line/70 bg-panelAlt/35 p-3">
+                <div className="grid gap-2">
+                  <p className="text-sm font-semibold text-text">Tài khoản đăng bài</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {autoPostPlatformOptions.map((platform) => {
+                      const account = connectedSocialAccountMap.get(platform.id);
+                      const connected = Boolean(account);
+                      return (
+                        <article
+                          key={platform.id}
+                          className={`rounded-card border p-3 ${
+                            connected ? "border-success/30 bg-success/10" : "border-line bg-panel/70"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-bold text-text">{platform.label}</p>
+                              <p className="mt-1 truncate text-xs text-subtext">
+                                {connected ? account?.displayName || account?.username || "Đã kết nối" : platform.note}
+                              </p>
+                            </div>
+                            <Badge tone={connected ? "success" : "warning"}>
+                              {connected ? "Đã kết nối" : "Chưa kết nối"}
+                            </Badge>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              variant={connected ? "secondary" : "primary"}
+                              className="!min-h-9 h-9 px-3 text-xs"
+                              disabled={socialConnectingPlatform === platform.id}
+                              onClick={() => handleConnectSocialPlatform(platform.id)}
+                            >
+                              {socialConnectingPlatform === platform.id ? "Đang mở..." : connected ? "Kết nối lại" : "Kết nối"}
+                            </Button>
+                            {connected ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                className="!min-h-9 h-9 px-3 text-xs"
+                                onClick={() => handleDisconnectSocialPlatform(platform.id)}
+                              >
+                                Gỡ
+                              </Button>
+                            ) : null}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
                 </div>
+
+                <div className="grid gap-2">
+                  <p className="text-sm font-semibold text-text">Nền tảng đăng</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {autoPostPlatformOptions.map((platform) => {
+                      const connected = hasConnectedSocialAccount(platform.id);
+                      const selected = autoPostPlatforms[platform.id];
+                      return (
+                        <button
+                          key={platform.id}
+                          type="button"
+                          onClick={() => handleToggleAutoPostPlatform(platform.id)}
+                          className={`flex cursor-pointer items-center justify-between rounded-card border px-3 py-3 text-left transition ${
+                            selected
+                              ? "border-primary/45 bg-primary/15 text-text"
+                              : "border-line bg-panel/70 text-subtext hover:border-primary/35"
+                          } ${connected ? "" : "opacity-80"}`}
+                        >
+                          <span>
+                            <span className="block font-bold">{platform.label}</span>
+                            <span className="mt-1 block text-xs text-subtext">
+                              {connected ? "Sẵn sàng đăng" : "Cần kết nối trước"}
+                            </span>
+                          </span>
+                          <Badge tone={selected ? "success" : connected ? "neutral" : "warning"}>
+                            {selected ? "Đã chọn" : connected ? "Tắt" : "Chưa kết nối"}
+                          </Badge>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid gap-1.5">
+                  <span className="text-sm font-semibold text-text">Ảnh / video</span>
+                  <label
+                    htmlFor="auto-post-files"
+                    className="flex cursor-pointer flex-col items-center justify-center rounded-card border border-dashed border-line bg-panel/70 px-4 py-7 text-center transition hover:border-primary/45 hover:bg-panelAlt/75"
+                  >
+                    <UploadCloud size={24} className="text-primary" />
+                    <span className="mt-2 text-sm font-bold text-text">Chọn ảnh hoặc video</span>
+                    <span className="mt-1 text-xs text-subtext">
+                      {autoPostFiles.length ? `${autoPostFiles.length} tệp đã chọn` : "Tối đa 10 tệp mỗi lần"}
+                    </span>
+                    <input
+                      id="auto-post-files"
+                      className="sr-only"
+                      type="file"
+                      accept="image/*,video/*"
+                      multiple
+                      onChange={handleAutoPostFileChange}
+                    />
+                  </label>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <SelectField
+                    label="Thời điểm đăng"
+                    value={autoPostMode}
+                    onChange={(event) => setAutoPostMode(event.target.value as "now" | "schedule")}
+                  >
+                    <option value="now">Đăng ngay</option>
+                    <option value="schedule">Hẹn giờ đăng</option>
+                  </SelectField>
+
+                  {autoPostMode === "schedule" ? (
+                    <InputField
+                      label="Ngày giờ hẹn đăng"
+                      type="datetime-local"
+                      value={autoPostScheduleAt}
+                      onChange={(event) => setAutoPostScheduleAt(event.target.value)}
+                    />
+                  ) : (
+                    <div className="grid min-w-0 gap-1.5">
+                      <span className="text-sm font-semibold leading-5 text-text">Trạng thái</span>
+                      <div className="flex h-[50px] min-w-0 items-center rounded-card border border-line bg-panelAlt/70 px-3">
+                        <p className="truncate text-sm text-text">Đăng ngay sau khi xác nhận</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {autoPostMode === "schedule" ? (
+                  <button
+                    type="button"
+                    onClick={() => setAutoPostUseNaturalDelay((value) => !value)}
+                    className="flex cursor-pointer items-start justify-between gap-3 rounded-card border border-line bg-panel/70 px-3 py-3 text-left transition hover:border-primary/40"
+                  >
+                    <span>
+                      <span className="block text-sm font-semibold text-text">Giãn giờ đăng tự nhiên</span>
+                      <span className="mt-1 block text-xs text-subtext">
+                        Tránh đăng đồng loạt cùng một giây lên nhiều nền tảng.
+                      </span>
+                    </span>
+                    <Badge tone={autoPostUseNaturalDelay ? "success" : "neutral"}>
+                      {autoPostUseNaturalDelay ? "Bật" : "Tắt"}
+                    </Badge>
+                  </button>
+                ) : null}
+
+                <TextAreaField
+                  label="Nội dung bài đăng"
+                  value={autoPostCaption}
+                  onChange={(event) => setAutoPostCaption(event.target.value)}
+                  placeholder="Nhập caption để đăng lên Facebook/Instagram"
+                  className="min-h-36"
+                />
               </div>
 
-              <InputField
-                label="Ảnh / video"
-                type="file"
-                accept="image/*,video/*"
-                multiple
-                onChange={handleAutoPostFileChange}
-                hint="Tối đa 10 tệp mỗi lần."
-              />
-
-              <SelectField
-                label="Thời điểm đăng"
-                value={autoPostMode}
-                onChange={(event) => setAutoPostMode(event.target.value as "now" | "schedule")}
-              >
-                <option value="now">Đăng ngay</option>
-                <option value="schedule">Hẹn giờ đăng</option>
-              </SelectField>
-
-              {autoPostMode === "schedule" ? (
-                <InputField
-                  label="Ngày giờ hẹn đăng"
-                  type="datetime-local"
-                  value={autoPostScheduleAt}
-                  onChange={(event) => setAutoPostScheduleAt(event.target.value)}
-                />
-              ) : null}
-
-              {autoPostMode === "schedule" ? (
-                <button
-                  type="button"
-                  onClick={() => setAutoPostUseNaturalDelay((value) => !value)}
-                  className="flex items-start justify-between gap-3 rounded-card border border-line bg-panelAlt px-3 py-3 text-left transition hover:border-primary/60"
-                >
-                  <span>
-                    <span className="block text-sm font-semibold text-text">Giãn giờ đăng tự nhiên</span>
-                    <span className="mt-1 block text-xs text-subtext">
-                      Tránh đăng đồng loạt cùng một giây lên nhiều nền tảng.
-                    </span>
-                  </span>
-                  <Badge tone={autoPostUseNaturalDelay ? "success" : "neutral"}>
-                    {autoPostUseNaturalDelay ? "Bật" : "Tắt"}
-                  </Badge>
-                </button>
-              ) : null}
-
-              <TextAreaField
-                label="Nội dung bài đăng"
-                value={autoPostCaption}
-                onChange={(event) => setAutoPostCaption(event.target.value)}
-                placeholder="Nhập caption để đăng lên Facebook/Instagram"
-              />
-
-              <div className="flex flex-wrap gap-2">
+              <div className="grid gap-2 sm:grid-cols-[1fr,auto]">
                 <Button type="submit" disabled={autoPostSubmitting}>
                   <SendHorizontal size={16} />
-                  {autoPostSubmitting ? "Đang xử lý..." : "Xác nhận đăng tự động"}
+                  {autoPostSubmitting ? "Đang xử lý..." : "Xác nhận đăng"}
                 </Button>
                 <Button type="button" variant="secondary" onClick={handleUseAiResultForPost}>
                   <Sparkles size={16} />
-                  Dùng nội dung AI gần nhất
+                  Dùng bài vừa tạo
                 </Button>
               </div>
             </form>
           </Card>
 
-          <Card className="grid gap-3">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-lg font-bold text-text">Xem trước cấu hình đăng</h3>
-              <Badge tone="neutral">{enabledAutoPostPlatforms.length} nền tảng</Badge>
+          <Card className="grid gap-3 bg-panel/86">
+            <PanelHeader
+              icon={<CircleDot size={18} />}
+              title="Xem trước bài đăng"
+              description="Kiểm tra nền tảng, thời điểm, tệp và caption trước khi xác nhận."
+              action={<Badge tone="neutral">{enabledAutoPostPlatforms.length} nền tảng</Badge>}
+            />
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <article className="rounded-card border border-line/70 bg-panelAlt/45 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-subtext">Nền tảng đã chọn</p>
+                <p className="mt-2 text-sm font-semibold text-text">
+                  {enabledAutoPostPlatforms.length ? enabledAutoPostPlatforms.join(" · ") : "Chưa chọn nền tảng."}
+                </p>
+              </article>
+
+              <article className="rounded-card border border-line/70 bg-panelAlt/45 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-subtext">Thời điểm đăng</p>
+                <p className="mt-2 text-sm font-semibold text-text">
+                  {autoPostMode === "now"
+                    ? "Đăng ngay sau khi xác nhận"
+                    : autoPostScheduleAt
+                      ? new Date(autoPostScheduleAt).toLocaleString("vi-VN", { hour12: false })
+                      : "Chưa chọn thời gian hẹn đăng"}
+                </p>
+              </article>
             </div>
 
-            <article className="rounded-card border border-line bg-panelAlt p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-subtext">Nền tảng đã chọn</p>
-              <p className="mt-1 text-sm text-text">
-                {enabledAutoPostPlatforms.length ? enabledAutoPostPlatforms.join(" · ") : "Chưa chọn nền tảng."}
-              </p>
-            </article>
-
-            <article className="rounded-card border border-line bg-panelAlt p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-subtext">Thời điểm đăng</p>
-              <p className="mt-1 text-sm text-text">
-                {autoPostMode === "now"
-                  ? "Đăng ngay sau khi xác nhận"
-                  : autoPostScheduleAt
-                    ? new Date(autoPostScheduleAt).toLocaleString("vi-VN", { hour12: false })
-                    : "Chưa chọn thời gian hẹn đăng"}
-              </p>
-            </article>
-
-            <article className="rounded-card border border-line bg-panelAlt p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-subtext">Tệp đã tải lên</p>
+            <article className="rounded-card border border-line/70 bg-panelAlt/45 p-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-subtext">Tệp đã chọn</p>
               {autoPostFiles.length === 0 ? (
-                <p className="mt-1 text-sm text-subtext">Chưa có tệp.</p>
+                <p className="mt-2 text-sm text-subtext">Chưa có tệp.</p>
               ) : (
-                <div className="mt-2 grid max-h-[280px] gap-2 overflow-y-auto pr-1">
+                <div className="mt-3 grid max-h-[260px] gap-2 overflow-y-auto pr-1">
                   {autoPostFiles.map((file, index) => (
-                    <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded-card border border-line/70 bg-panel px-3 py-2">
+                    <div
+                      key={`${file.name}-${index}`}
+                      className="flex items-center justify-between gap-2 rounded-card border border-line/70 bg-panel/75 px-3 py-2"
+                    >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-text">{file.name}</p>
                         <p className="text-xs text-subtext">{file.type || "application/octet-stream"}</p>
@@ -1504,7 +1976,7 @@ export function AppHomePage() {
                   {autoPostMediaWarnings.map((warning, index) => (
                     <div
                       key={`${warning.fileName}-${index}`}
-                      className="rounded-card border border-warning/35 bg-warning/10 px-3 py-2 text-xs text-subtext"
+                      className="rounded-card border border-warning/30 bg-warning/10 px-3 py-2 text-xs leading-5 text-subtext"
                     >
                       <span className="font-semibold text-text">{warning.fileName}: </span>
                       {warning.message}
@@ -1514,55 +1986,49 @@ export function AppHomePage() {
               ) : null}
             </article>
 
-            <article className="rounded-card border border-line bg-panelAlt p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-subtext">Nội dung sẽ đăng</p>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-text">
+            <article className="rounded-card border border-line/70 bg-panelAlt/45 p-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-subtext">Nội dung sẽ đăng</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-text">
                 {autoPostCaption.trim() || "Chưa có nội dung."}
               </p>
             </article>
 
-            <article className="rounded-card border border-line bg-panelAlt p-3">
-              <p className="inline-flex items-center gap-2 text-sm font-semibold text-text">
+            <article className="rounded-card border border-line/70 bg-panelAlt/35 p-3">
+              <p className="inline-flex items-center gap-2 text-sm font-bold text-text">
                 <UploadCloud size={16} />
-                Trạng thái tích hợp
+                Kết nối đăng bài
               </p>
-              <p className="mt-1 text-xs text-subtext">
-                Mục này đã tách riêng theo yêu cầu của bạn. Mình sẽ nối API Zernio để bấm là đăng thật ở bước tiếp theo.
-              </p>
-              <p className="mt-1 text-xs text-subtext">
-                Webhook: /api/integrations/zernio/webhook
-              </p>
-              <p className="mt-1 text-xs text-subtext">
-                Đã bật luồng đăng thật: hệ thống sẽ gửi bài qua Zernio ngay sau khi bạn bấm xác nhận.
+              <p className="mt-2 text-xs leading-5 text-subtext">
+                Hệ thống sẽ gửi bài qua Zernio sau khi bạn bấm xác nhận. Nếu một nền tảng lỗi, nền tảng còn lại vẫn được xử lý.
               </p>
               {autoPostLastResult ? (
                 <div className="mt-3 grid max-h-[220px] gap-2 overflow-y-auto pr-1">
                   {autoPostLastResult.results.map((item, index) => (
                     <div
                       key={`${item.platform}-${item.postId || index}`}
-                      className="rounded-card border border-line/70 bg-panel px-3 py-2 text-sm"
+                      className="rounded-card border border-line/70 bg-panel/75 px-3 py-2 text-sm"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="font-semibold text-text">{item.platform.toUpperCase()}</p>
-                        <Badge tone={item.ok ? "success" : "warning"}>{item.ok ? "Thanh cong" : "Loi"}</Badge>
+                        <Badge tone={item.ok ? "success" : "warning"}>{item.ok ? "Thành công" : "Có lỗi"}</Badge>
                       </div>
-                      <p className="mt-1 text-xs text-subtext">{item.message || "Da xu ly."}</p>
+                      <p className="mt-1 text-xs text-subtext">{item.message || "Đã xử lý."}</p>
                       {item.platformPostUrl ? (
                         <a
                           href={item.platformPostUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="mt-1 inline-block text-xs text-primary hover:underline"
+                          className="mt-1 inline-block text-xs font-semibold text-primary hover:underline"
                         >
-                          Mo bai da dang
+                          Mở bài đã đăng
                         </a>
                       ) : null}
                     </div>
                   ))}
                 </div>
               ) : null}
-              <p className="mt-1 text-xs text-subtext">
-                Chế độ: {autoPostMode === "now" ? "Đăng ngay" : "Hẹn giờ"} · Timezone mặc định: Asia/Bangkok
+              <p className="mt-2 text-xs text-subtext">
+                Chế độ: {autoPostMode === "now" ? "Đăng ngay" : "Hẹn giờ"} · Múi giờ: Asia/Bangkok
               </p>
             </article>
           </Card>
