@@ -1,0 +1,40 @@
+<svg width="1280" height="760" viewBox="0 0 1280 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="760" rx="36" fill="#120B12"/>
+  <rect x="52" y="52" width="1176" height="656" rx="28" fill="#171118" stroke="#4A2436"/>
+
+  <text x="88" y="118" fill="#F4D4E2" font-size="42" font-family="Inter, Arial, sans-serif" font-weight="800">Architecture snapshot</text>
+  <text x="88" y="156" fill="#BCA6B0" font-size="22" font-family="Inter, Arial, sans-serif">A practical full-stack setup for a private SaaS product in active development.</text>
+
+  <rect x="90" y="238" width="254" height="290" rx="24" fill="#1C151D" stroke="#5A2D42"/>
+  <rect x="512" y="238" width="254" height="290" rx="24" fill="#1C151D" stroke="#5A2D42"/>
+  <rect x="934" y="238" width="254" height="290" rx="24" fill="#1C151D" stroke="#5A2D42"/>
+
+  <text x="132" y="286" fill="#FFFFFF" font-size="28" font-family="Inter, Arial, sans-serif" font-weight="800">Frontend</text>
+  <text x="132" y="326" fill="#D2BDC7" font-size="19" font-family="Inter, Arial, sans-serif">React + TypeScript + Vite</text>
+  <text x="132" y="356" fill="#D2BDC7" font-size="19" font-family="Inter, Arial, sans-serif">Tailwind + Router</text>
+  <text x="132" y="400" fill="#F1E8ED" font-size="18" font-family="Inter, Arial, sans-serif">• Landing page</text>
+  <text x="132" y="430" fill="#F1E8ED" font-size="18" font-family="Inter, Arial, sans-serif">• Customer dashboard</text>
+  <text x="132" y="460" fill="#F1E8ED" font-size="18" font-family="Inter, Arial, sans-serif">• Admin workspace</text>
+
+  <text x="554" y="286" fill="#FFFFFF" font-size="28" font-family="Inter, Arial, sans-serif" font-weight="800">API layer</text>
+  <text x="554" y="326" fill="#D2BDC7" font-size="19" font-family="Inter, Arial, sans-serif">Express + JWT + services</text>
+  <text x="554" y="356" fill="#D2BDC7" font-size="19" font-family="Inter, Arial, sans-serif">role checks and task logic</text>
+  <text x="554" y="400" fill="#F1E8ED" font-size="18" font-family="Inter, Arial, sans-serif">• Auth endpoints</text>
+  <text x="554" y="430" fill="#F1E8ED" font-size="18" font-family="Inter, Arial, sans-serif">• Lead / task endpoints</text>
+  <text x="554" y="460" fill="#F1E8ED" font-size="18" font-family="Inter, Arial, sans-serif">• AI + social integrations</text>
+
+  <text x="976" y="286" fill="#FFFFFF" font-size="28" font-family="Inter, Arial, sans-serif" font-weight="800">Data & integrations</text>
+  <text x="976" y="326" fill="#D2BDC7" font-size="19" font-family="Inter, Arial, sans-serif">Supabase + external providers</text>
+  <text x="976" y="356" fill="#D2BDC7" font-size="19" font-family="Inter, Arial, sans-serif">resilient fallback flow</text>
+  <text x="976" y="400" fill="#F1E8ED" font-size="18" font-family="Inter, Arial, sans-serif">• Auth + Postgres</text>
+  <text x="976" y="430" fill="#F1E8ED" font-size="18" font-family="Inter, Arial, sans-serif">• Groq / Cloudflare / OpenRouter / Gemini</text>
+  <text x="976" y="460" fill="#F1E8ED" font-size="18" font-family="Inter, Arial, sans-serif">• Facebook / Instagram / webhook flow</text>
+
+  <path d="M344 382H512" stroke="#6F4252" stroke-width="8" stroke-linecap="round"/>
+  <path d="M766 382H934" stroke="#6F4252" stroke-width="8" stroke-linecap="round"/>
+
+  <rect x="90" y="578" width="1098" height="84" rx="20" fill="#1C151D" stroke="#5A2D42"/>
+  <text x="128" y="628" fill="#FFFFFF" font-size="22" font-family="Inter, Arial, sans-serif" font-weight="700">
+    Design goal: keep the customer-facing experience simple while preserving enough backend structure for scaling, admin control, and provider failover.
+  </text>
+</svg>

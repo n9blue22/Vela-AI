@@ -380,7 +380,7 @@ function buildProviders(payload, timeoutMs) {
             timeoutMs,
             extraHeaders: {
               "HTTP-Referer": env.FRONTEND_URL,
-              "X-Title": "Spa AI Studio"
+              "X-Title": "VELA AI"
             }
           })
       });

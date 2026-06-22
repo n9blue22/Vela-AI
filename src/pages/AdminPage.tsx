@@ -268,9 +268,8 @@ export function AdminPage() {
       <header className="mb-5 overflow-hidden rounded-card border border-white/20 bg-panel/80 p-4 shadow-soft backdrop-blur-xl md:p-5">
         <div className="grid gap-5 lg:grid-cols-[1fr,360px] lg:items-center">
           <div className="space-y-4">
-            <div className="inline-flex items-center gap-3 rounded-card border border-line/70 bg-panelAlt/60 px-2.5 py-2 shadow-soft backdrop-blur-xl">
-              <AppBrand logoClassName="h-10 max-w-[105px] rounded-md" />
-              <div className="h-8 w-px bg-line/80" />
+            <div className="inline-flex items-center rounded-[18px] border border-[#4d2132] bg-[#1b1017]/88 px-3 py-2 shadow-soft backdrop-blur-xl">
+              <AppBrand compact logoClassName="h-10 w-10" />
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-subtext">Admin Center</p>
                 <p className="text-xs text-subtext/90">Quản lý người dùng, gói dịch vụ và yêu cầu toàn hệ thống</p>
@@ -281,7 +280,7 @@ export function AdminPage() {
                 <ShieldCheck size={14} />
                 Bảng điều khiển quản trị
               </p>
-              <h1 className="mt-3 text-3xl font-extrabold leading-tight text-text md:text-4xl">Quản trị hệ thống Spa AI</h1>
+              <h1 className="mt-3 text-3xl font-extrabold leading-tight text-text md:text-4xl">Quản trị hệ thống VELA AI</h1>
               <p className="mt-2 max-w-[680px] text-sm leading-6 text-subtext">
                 Xin chào {user?.name}. Theo dõi vận hành, duyệt yêu cầu nâng cấp và phân quyền người dùng trong một giao diện gọn hơn.
               </p>

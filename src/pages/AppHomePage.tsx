@@ -228,6 +228,7 @@ export function AppHomePage() {
 
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [loading, setLoading] = useState(false);
+  const [contentHistoryLoaded, setContentHistoryLoaded] = useState(false);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [showUpdateBox, setShowUpdateBox] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
@@ -358,12 +359,10 @@ export function AppHomePage() {
   const reloadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [leadData, taskData, quotaData, historyData, socialData] = await Promise.allSettled([
+      const [leadData, taskData, quotaData] = await Promise.allSettled([
         appService.getLeads(token),
         appService.getTasks(token),
-        appService.getQuota(token),
-        appService.getContentHistory(token, 12),
-        appService.getSocialAccounts(token)
+        appService.getQuota(token)
       ]);
 
       if (leadData.status === "fulfilled") {
@@ -379,18 +378,7 @@ export function AppHomePage() {
           remaining: quotaData.value.remaining
         });
       }
-      if (historyData.status === "fulfilled") {
-        setContentHistory(historyData.value.items);
-      }
-      if (socialData.status === "fulfilled") {
-        setSocialAccounts(socialData.value.accounts);
-        setSocialAccountsLoaded(true);
-      } else {
-        setSocialAccounts([]);
-        setSocialAccountsLoaded(true);
-      }
-
-      const firstRejected = [leadData, taskData, quotaData, historyData, socialData].find(
+      const firstRejected = [leadData, taskData, quotaData].find(
         (result) => result.status === "rejected"
       );
       if (firstRejected && firstRejected.status === "rejected") {
@@ -408,9 +396,63 @@ export function AppHomePage() {
     }
   }, [notify, token]);
 
+  const loadContentHistory = useCallback(
+    async (options?: { notifyOnError?: boolean }) => {
+      const notifyOnError = options?.notifyOnError ?? true;
+      try {
+        const historyData = await appService.getContentHistory(token, 12);
+        setContentHistory(historyData.items);
+      } catch (error) {
+        if (notifyOnError) {
+          const message = error instanceof Error ? error.message : "Khong the tai lich su noi dung.";
+          notify(message, "error");
+        }
+      } finally {
+        setContentHistoryLoaded(true);
+      }
+    },
+    [notify, token]
+  );
+
+  const loadSocialAccounts = useCallback(
+    async (options?: { notifyOnError?: boolean }) => {
+      const notifyOnError = options?.notifyOnError ?? true;
+      try {
+        const socialData = await appService.getSocialAccounts(token);
+        setSocialAccounts(socialData.accounts);
+      } catch (error) {
+        setSocialAccounts([]);
+        if (notifyOnError) {
+          const message = error instanceof Error ? error.message : "Khong the tai tai khoan dang bai.";
+          notify(message, "error");
+        }
+      } finally {
+        setSocialAccountsLoaded(true);
+      }
+    },
+    [notify, token]
+  );
+
+  const refreshAllData = useCallback(async () => {
+    await reloadData();
+    await Promise.all([
+      loadContentHistory({ notifyOnError: false }),
+      loadSocialAccounts({ notifyOnError: false })
+    ]);
+  }, [loadContentHistory, loadSocialAccounts, reloadData]);
+
   useEffect(() => {
     reloadData().catch(() => undefined);
   }, [reloadData]);
+
+  useEffect(() => {
+    if (activeTab === "content" && !contentHistoryLoaded) {
+      loadContentHistory({ notifyOnError: false }).catch(() => undefined);
+    }
+    if (activeTab === "autopost" && !socialAccountsLoaded) {
+      loadSocialAccounts({ notifyOnError: false }).catch(() => undefined);
+    }
+  }, [activeTab, contentHistoryLoaded, loadContentHistory, loadSocialAccounts, socialAccountsLoaded]);
 
   useEffect(() => {
     setUpdateName(user?.name || "");
@@ -672,6 +714,7 @@ export function AppHomePage() {
       try {
         const historyData = await appService.getContentHistory(token, 12);
         setContentHistory(historyData.items);
+        setContentHistoryLoaded(true);
       } catch (historyError) {
         console.error("[content-history] refresh failed", historyError);
       }
@@ -1030,22 +1073,17 @@ export function AppHomePage() {
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-[1180px] px-4 py-5 md:px-5">
-      <header className="mb-3 overflow-visible rounded-card border border-white/10 bg-panel/80 p-2.5 shadow-soft backdrop-blur-xl md:p-3">
+      <header className="relative z-40 mb-3 overflow-visible isolate rounded-card border border-white/10 bg-panel/80 p-2.5 shadow-soft backdrop-blur-xl md:p-3">
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr),600px] xl:items-center">
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="inline-flex shrink-0 items-center gap-2 rounded-card border border-line/70 bg-panelAlt/55 px-2 py-1.5 shadow-soft backdrop-blur-xl">
-              <AppBrand logoClassName="h-8 max-w-[84px] rounded-md" />
-              <div className="h-6 w-px bg-line/80" />
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-subtext">EMS AI MARKETING SPA</p>
-                <p className="text-[11px] text-subtext/90">Marketing cho spa</p>
-              </div>
+            <div className="inline-flex shrink-0 items-center rounded-[18px] border border-[#4d2132] bg-[#1b1017]/88 px-2.5 py-2 shadow-soft backdrop-blur-xl">
+              <AppBrand compact logoClassName="h-10 w-10" />
             </div>
 
             <div className="min-w-0">
-              <p className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-primary">
+              <p className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.22em] text-primary">
                 <Sparkles size={12} />
-                Bảng điều khiển hôm nay
+                VELA AI dashboard
               </p>
               <h1 className="mt-1 text-2xl font-extrabold leading-tight text-text">Xin chào {user?.name}</h1>
               <p className="mt-0.5 max-w-[520px] truncate text-xs leading-5 text-subtext">
@@ -1088,7 +1126,7 @@ export function AppHomePage() {
                 Nâng cấp
               </Button>
 
-              <div className="relative shrink-0" ref={headerMenuRef}>
+              <div className="relative z-50 shrink-0" ref={headerMenuRef}>
                 <Button
                   variant="secondary"
                   className="!min-h-8 h-8 px-2 text-xs"
@@ -1100,7 +1138,7 @@ export function AppHomePage() {
                 </Button>
 
                 {showHeaderMenu ? (
-                  <div className="absolute right-0 top-[calc(100%+8px)] z-30 w-[220px] rounded-card border border-line bg-panel p-2 shadow-soft">
+                  <div className="absolute right-0 top-[calc(100%+8px)] z-[80] w-[220px] rounded-card border border-line bg-panel p-2 shadow-soft">
                     {user?.role === "admin" ? (
                       <button
                         type="button"
@@ -1119,7 +1157,7 @@ export function AppHomePage() {
                       className="flex w-full items-center rounded-card px-3 py-2 text-left text-sm font-semibold text-text hover:bg-panelAlt"
                       onClick={() => {
                         setShowHeaderMenu(false);
-                        Promise.all([refreshMe(), reloadData()]).catch(() => undefined);
+                        Promise.all([refreshMe(), refreshAllData()]).catch(() => undefined);
                       }}
                     >
                       Làm mới dữ liệu
@@ -1203,7 +1241,7 @@ export function AppHomePage() {
         </Card>
       ) : null}
 
-      <div className="mb-4 flex flex-wrap gap-2 rounded-card border border-white/10 bg-panel/70 p-2 shadow-soft backdrop-blur-xl">
+      <div className="relative z-10 mb-4 flex flex-wrap gap-2 rounded-card border border-white/10 bg-panel/70 p-2 shadow-soft backdrop-blur-xl">
         <button className={tabButtonClass("overview")} type="button" onClick={() => setActiveTab("overview")}>
           <LayoutDashboard size={16} />
           Tổng quan
@@ -1289,7 +1327,7 @@ export function AppHomePage() {
                   <Crown size={16} />
                   Xem gói nâng cấp
                 </Button>
-                <Button variant="secondary" onClick={() => reloadData()} className="w-full">
+                <Button variant="secondary" onClick={() => refreshAllData()} className="w-full">
                   Làm mới dữ liệu
                 </Button>
               </div>

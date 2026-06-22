@@ -1,116 +1,190 @@
-# Spa AI Studio (Supabase + Multi AI Fallback)
+# VELA AI
 
-Full-stack app for spa owners in Vietnam:
-- Landing + pricing
-- Register / login / forgot password (no SMTP mode)
-- Lead + task management
-- AI content generation with automatic fallback
+AI-powered spa marketing and operations platform for Vietnamese beauty businesses.
 
-## AI architecture (stable + low cost)
+<p align="center">
+  <img src="./docs/vela-hero.svg" alt="VELA AI hero banner" width="100%" />
+</p>
 
-Default provider order:
-1. `groq`
-2. `cloudflare`
-3. `openrouter`
-4. `gemini`
+<p align="left">
+  <img src="https://img.shields.io/badge/React-18-20232A?logo=react&logoColor=61DAFB" alt="React 18" />
+  <img src="https://img.shields.io/badge/TypeScript-5-1F6FEB?logo=typescript&logoColor=white" alt="TypeScript 5" />
+  <img src="https://img.shields.io/badge/Vite-5-6B46C1?logo=vite&logoColor=white" alt="Vite 5" />
+  <img src="https://img.shields.io/badge/Express-API-1F2937?logo=express&logoColor=white" alt="Express API" />
+  <img src="https://img.shields.io/badge/Supabase-Auth%20%26%20Postgres-0F172A?logo=supabase&logoColor=3ECF8E" alt="Supabase" />
+  <img src="https://img.shields.io/badge/Tailwind-UI-0F172A?logo=tailwindcss&logoColor=38BDF8" alt="Tailwind CSS" />
+</p>
 
-If all providers fail, backend returns a built-in draft template so user flow does not break.
+## Overview
 
-## Tech
+VELA AI helps spa owners and operators manage daily marketing work from one dashboard:
 
-- Frontend: React + TypeScript + Tailwind + React Router
-- Backend: Express + Supabase (Postgres) + JWT
-- AI Providers: Groq, Cloudflare Workers AI, OpenRouter, Gemini
+- generate Vietnamese marketing content with multi-provider AI fallback
+- track incoming leads and move them through a simple sales pipeline
+- organize customer tasks separately from admin review tasks
+- prepare Facebook and Instagram posting flows with user-scoped social accounts
+- control plan limits, upgrades, and admin actions on top of Supabase
 
-## Setup
+| Built for | Experience | Outcome |
+| --- | --- | --- |
+| Spa owners, managers, and front-desk teams in Vietnam | One workspace for content, leads, tasks, upgrades, and guided publishing | Faster daily operations, more consistent posting, and cleaner customer follow-up |
 
-1. Install dependencies:
+## Product Visuals
+
+| Brand & Positioning | Platform Modules |
+| --- | --- |
+| ![VELA AI brand cover](./docs/vela-hero.svg) | ![VELA AI module overview](./docs/vela-system-overview.svg) |
+
+| Customer Workflow | Architecture Snapshot |
+| --- | --- |
+| ![VELA AI workflow](./docs/vela-workflow.svg) | ![VELA AI architecture](./docs/vela-architecture.svg) |
+
+## Core Capabilities
+
+### 1. AI content generation
+- Vietnamese spa-focused copywriting
+- headline, body, CTA, reply template, and hashtags
+- provider fallback order: `groq -> cloudflare -> openrouter -> gemini`
+- built-in draft fallback if every provider fails
+
+### 2. Lead and task operations
+- lead capture with status updates
+- personal customer tasks inside the client dashboard
+- admin-only operational tasks inside the admin area
+- quick actions for follow-up and campaign preparation
+
+### 3. Guided social publishing
+- customer-scoped Facebook and Instagram account connection
+- auto-post preparation with media checks and warnings
+- immediate publishing or scheduled publishing flow
+- failure isolation so one platform can fail without blocking the other
+
+### 4. Plan, billing, and admin controls
+- free, saving, and premium plan model
+- quota-aware content generation
+- manual payment confirmation flow
+- admin role management and plan upgrades
+
+## Architecture
+
+### Frontend
+- React 18
+- TypeScript
+- Vite
+- Tailwind CSS
+- React Router
+
+### Backend
+- Express
+- Supabase Auth
+- Supabase Postgres
+- JWT session flow
+
+### AI layer
+- Groq
+- Cloudflare Workers AI
+- OpenRouter
+- Gemini
+
+## Project Structure
+
+```text
+.
+|-- public/                     # favicon and public assets
+|-- server/
+|   |-- src/
+|   |   |-- controllers/        # route handlers
+|   |   |-- middleware/         # auth and request guards
+|   |   |-- routes/             # API route registration
+|   |   |-- services/           # AI, billing, social, and task services
+|   |   `-- utils/              # helpers
+|   `-- index.js                # backend entry
+|-- src/
+|   |-- features/               # auth, billing, app-level features
+|   |-- pages/                  # landing, dashboard, admin, auth pages
+|   |-- services/               # frontend API client layer
+|   |-- shared/                 # reusable UI, constants, layout, utilities
+|   `-- types/                  # shared frontend types
+|-- supabase/
+|   `-- schema.sql              # database bootstrap
+`-- README.md
+```
+
+## Local Setup
+
+### 1. Install dependencies
+
 ```bash
 npm install
 ```
 
-2. Create `.env` manually at project root, then fill:
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `JWT_SECRET`
-- `GROQ_API_KEY`
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-- `OPENROUTER_API_KEY`
-- Optional: `GEMINI_API_KEY`
+### 2. Create your `.env` manually
 
-3. In Supabase SQL Editor, run:
-- `supabase/schema.sql`
+Fill the root `.env` with the variables your environment uses:
 
-4. Start frontend + backend:
+```bash
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+JWT_SECRET=
+GROQ_API_KEY=
+CLOUDFLARE_API_TOKEN=
+CLOUDFLARE_ACCOUNT_ID=
+OPENROUTER_API_KEY=
+GEMINI_API_KEY=
+ZERNIO_WEBHOOK_SECRET=
+```
+
+### 3. Bootstrap the database
+
+Run the full schema in Supabase SQL Editor:
+
+```text
+supabase/schema.sql
+```
+
+### 4. Start the app
+
 ```bash
 npm run dev
 ```
 
-5. URLs:
-- Frontend: `http://127.0.0.1:5173`
-- Backend API: `http://127.0.0.1:5050/api`
+Local URLs:
 
-## No SMTP mode
+- frontend: `http://127.0.0.1:5173`
+- backend API: `http://127.0.0.1:5050/api`
 
-- Register account is active immediately.
-- Forgot-password endpoint can return reset link/token in app (dev-friendly mode).
+## Operational Notes
 
-## Zernio webhook (easy explanation)
+### No-SMTP mode
+- registration can work without a paid SMTP provider
+- forgot-password can return reset information in a developer-friendly flow
 
-Webhook is a public URL in your backend so Zernio can report publishing status (`published`, `failed`, `partial`).
+### Social publishing
+- customer publishing is account-scoped, not global-account scoped
+- Facebook posts go to connected Pages
+- Instagram requires a connected Business or Creator account
 
-## Zernio customer social accounts
+### Webhooks
+- Zernio webhooks are received at:
+  - production: `https://your-domain.com/api/integrations/zernio/webhook`
+  - local tunnel: `https://your-tunnel/api/integrations/zernio/webhook`
 
-Auto-post is now user-scoped:
-- Each customer connects their own Facebook/Instagram in the app.
-- The publish endpoint only uses the account saved for the currently logged-in customer.
-- The global `ZERNIO_ACCOUNT_ID_FACEBOOK` / `ZERNIO_ACCOUNT_ID_INSTAGRAM` values are not used for customer publishing.
+## Why This Repo Matters
 
-After pulling this change, run `supabase/schema.sql` again in Supabase SQL Editor so the new `social_profiles` and `social_accounts` tables exist.
+This project is not just a landing page or a prompt wrapper. It combines:
 
-### 1) Webhook URL you need to put in Zernio
+- SaaS-style auth and role management
+- quota-based AI generation
+- resilient provider fallback
+- admin and customer workflow separation
+- payment-review operations
+- social publishing preparation for real business use
 
-- Production:
-  - `https://your-domain.com/api/integrations/zernio/webhook`
-- Local dev (temporary):
-  - create a tunnel URL, then add `/api/integrations/zernio/webhook`
+## Status
 
-### 2) Fast local test (no ngrok/cloudflared installed)
+VELA AI is currently set up as a working full-stack product for local development and private iteration, with the strongest experience centered on:
 
-Run backend first:
-```bash
-npm run dev:server
-```
-
-Open another terminal:
-```bash
-npx localtunnel --port 5050
-```
-
-You will get URL like:
-```text
-https://abc123.loca.lt
-```
-
-Webhook URL for Zernio will be:
-```text
-https://abc123.loca.lt/api/integrations/zernio/webhook
-```
-
-### 3) Secret verification (important)
-
-Set same secret in both places:
-- In your `.env`:
-  - `ZERNIO_WEBHOOK_SECRET=your_long_random_secret`
-- In Zernio webhook settings:
-  - Secret = same value above
-
-### 4) Check webhook received or not
-
-- Health check:
-  - `GET /api/health`
-- Admin webhook log endpoint:
-  - `GET /api/admin/integrations/webhooks?provider=zernio&limit=20`
-
-If webhook is connected correctly, events will be stored in `integration_webhook_events`.
+- AI-assisted spa content creation
+- lead and task operations
+- guided Facebook/Instagram posting preparation
+- Vietnamese-first UI for small beauty businesses

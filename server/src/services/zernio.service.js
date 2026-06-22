@@ -200,7 +200,7 @@ export async function createProfileForUser({ name, email, userId }) {
     method: "POST",
     body: {
       name: profileName,
-      description: `Social profile for ${String(email || userId || "EMS customer").slice(0, 120)}`,
+      description: `Social profile for ${String(email || userId || "VELA customer").slice(0, 120)}`,
       color: "#d6678d"
     }
   });

@@ -69,18 +69,20 @@ export function LandingPage() {
 
   return (
     <div className="min-h-screen overflow-hidden text-text">
-      <header className="sticky top-0 z-30 border-b border-white/20 bg-panel/80 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-[1180px] items-center justify-between gap-4 px-4 py-3">
-          <AppBrand logoClassName="h-10 max-w-[170px] sm:max-w-[210px]" />
+      <header className="sticky top-0 z-30 px-4 py-3">
+        <div className="mx-auto flex w-full max-w-[1180px] items-center justify-between gap-4 rounded-[18px] border border-white/15 bg-panel/72 px-4 py-3 shadow-soft backdrop-blur-2xl">
+          <div className="rounded-[16px] border border-[#53283a] bg-[#1c1017]/90 px-3 py-2 shadow-soft">
+            <AppBrand compact logoClassName="h-10 w-10" />
+          </div>
 
-          <nav className="hidden items-center gap-6 text-sm font-semibold text-subtext md:inline-flex">
-            <a href="#features" className="transition hover:text-text">
+          <nav className="hidden items-center gap-1 rounded-full border border-line/80 bg-panelAlt/50 p-1 text-sm font-semibold text-subtext md:inline-flex">
+            <a href="#features" className="inline-flex min-h-10 items-center rounded-full px-4 transition hover:bg-panel hover:text-text">
               Tính năng
             </a>
-            <a href="#analytics" className="transition hover:text-text">
+            <a href="#analytics" className="inline-flex min-h-10 items-center rounded-full px-4 transition hover:bg-panel hover:text-text">
               Báo cáo
             </a>
-            <a href="#pricing" className="transition hover:text-text">
+            <a href="#pricing" className="inline-flex min-h-10 items-center rounded-full px-4 transition hover:bg-panel hover:text-text">
               Bảng giá
             </a>
           </nav>
@@ -89,7 +91,7 @@ export function LandingPage() {
             {isLoggedIn ? (
               <Link
                 to="/app"
-                className="inline-flex min-h-10 items-center justify-center rounded-card bg-primary px-4 text-sm font-bold text-white shadow-soft transition hover:bg-primaryStrong"
+                className="inline-flex min-h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-white shadow-soft transition hover:bg-primaryStrong"
               >
                 Vào dashboard
               </Link>
@@ -97,13 +99,13 @@ export function LandingPage() {
               <>
                 <Link
                   to="/login"
-                  className="hidden min-h-10 items-center justify-center rounded-card border border-line bg-panel/70 px-4 text-sm font-bold text-text transition hover:bg-panelAlt sm:inline-flex"
+                  className="hidden min-h-10 items-center justify-center rounded-full border border-line bg-panel/70 px-4 text-sm font-bold text-text transition hover:bg-panelAlt sm:inline-flex"
                 >
                   Đăng nhập
                 </Link>
                 <Link
                   to="/register"
-                  className="inline-flex min-h-10 items-center justify-center rounded-card bg-primary px-4 text-sm font-bold text-white shadow-soft transition hover:bg-primaryStrong"
+                  className="inline-flex min-h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-white shadow-soft transition hover:bg-primaryStrong"
                 >
                   Dùng thử miễn phí
                 </Link>
@@ -120,7 +122,7 @@ export function LandingPage() {
             <div className="max-w-[760px]">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-2 text-xs font-bold uppercase text-white shadow-soft backdrop-blur-xl">
                 <Sparkles size={15} />
-                EMS AI Marketing Spa
+                VELA AI
               </div>
               <h1 className="mt-5 max-w-[840px] text-4xl font-extrabold leading-tight text-white md:text-6xl">
                 Dashboard marketing giúp spa tạo nội dung, giữ lead và tăng lịch hẹn mỗi ngày
