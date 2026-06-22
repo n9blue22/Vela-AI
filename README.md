@@ -2,10 +2,6 @@
 
 AI-powered spa marketing and operations platform for Vietnamese beauty businesses.
 
-<p align="center">
-  <img src="./docs/vela-hero.svg" alt="VELA AI hero banner" width="100%" />
-</p>
-
 <p align="left">
   <img src="https://img.shields.io/badge/React-18-20232A?logo=react&logoColor=61DAFB" alt="React 18" />
   <img src="https://img.shields.io/badge/TypeScript-5-1F6FEB?logo=typescript&logoColor=white" alt="TypeScript 5" />
@@ -28,16 +24,6 @@ VELA AI helps spa owners and operators manage daily marketing work from one dash
 | Built for | Experience | Outcome |
 | --- | --- | --- |
 | Spa owners, managers, and front-desk teams in Vietnam | One workspace for content, leads, tasks, upgrades, and guided publishing | Faster daily operations, more consistent posting, and cleaner customer follow-up |
-
-## Product Visuals
-
-| Brand & Positioning | Platform Modules |
-| --- | --- |
-| ![VELA AI brand cover](./docs/vela-hero.svg) | ![VELA AI module overview](./docs/vela-system-overview.svg) |
-
-| Customer Workflow | Architecture Snapshot |
-| --- | --- |
-| ![VELA AI workflow](./docs/vela-workflow.svg) | ![VELA AI architecture](./docs/vela-architecture.svg) |
 
 ## Core Capabilities
 
