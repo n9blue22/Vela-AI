@@ -74,14 +74,14 @@ function PanelHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex w-full flex-wrap items-start justify-between gap-3">
+    <div className="flex w-full flex-wrap items-start justify-between gap-2">
       <div className="flex min-w-0 items-start gap-3">
-        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-card border border-primary/20 bg-primary/10 text-primary">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-card bg-primary/10 text-primary">
           {icon}
         </span>
         <div className="min-w-0">
-          <h2 className="text-xl font-extrabold leading-tight text-text">{title}</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-subtext">{description}</p>
+          <h2 className="text-[19px] font-extrabold leading-tight text-text md:text-[21px]">{title}</h2>
+          <p className="mt-1 max-w-2xl text-[12px] leading-5 text-subtext md:text-[13px]">{description}</p>
         </div>
       </div>
       {action}
@@ -101,12 +101,97 @@ function EmptyState({ icon, title, description }: { icon: ReactNode; title: stri
   );
 }
 
-function SoftStat({ label, value, tone = "text-text" }: { label: string; value: string | number; tone?: string }) {
+function SoftStat({
+  label,
+  value,
+  tone = "text-text",
+  note,
+  icon
+}: {
+  label: string;
+  value: string | number;
+  tone?: string;
+  note: string;
+  icon: ReactNode;
+}) {
   return (
-    <article className="rounded-card border border-line/70 bg-panelAlt/45 px-3 py-2">
-      <p className="text-xs font-bold uppercase tracking-wide text-subtext">{label}</p>
-      <p className={`mt-1 text-xl font-extrabold ${tone}`}>{value}</p>
+    <article className="rounded-card border border-white/[0.055] bg-white/[0.025] px-3.5 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-card bg-white/[0.045] text-subtext">
+              {icon}
+            </span>
+            <p className="truncate text-[10px] font-bold uppercase tracking-[0.15em] text-subtext">{label}</p>
+          </div>
+          <p className="mt-2 text-[11px] leading-5 text-subtext">{note}</p>
+        </div>
+        <p className={`shrink-0 text-[28px] font-extrabold leading-none ${tone}`}>{value}</p>
+      </div>
     </article>
+  );
+}
+
+function ResourceRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-white/[0.055] py-2.5 last:border-b-0">
+      <span className="text-[12px] text-subtext">{label}</span>
+      <span className="text-[12px] font-semibold text-text">{value}</span>
+    </div>
+  );
+}
+
+function QuickAction({
+  icon,
+  label,
+  hint,
+  accent = false,
+  onClick
+}: {
+  icon: ReactNode;
+  label: string;
+  hint: string;
+  accent?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group flex min-h-[70px] w-full cursor-pointer items-center gap-3 rounded-card border px-3 py-2.5 text-left transition duration-200 ${
+        accent
+          ? "border-primary/[0.16] bg-primary/[0.09] text-text hover:bg-primary/[0.13]"
+          : "border-white/[0.055] bg-white/[0.02] text-text hover:border-primary/[0.16] hover:bg-white/[0.045]"
+      }`}
+    >
+      <span
+        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-card ${
+          accent ? "bg-primary/[0.14] text-primary" : "bg-white/[0.045] text-subtext"
+        }`}
+      >
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p className="text-[14px] font-bold">{label}</p>
+        <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-subtext">{hint}</p>
+      </div>
+    </button>
+  );
+}
+
+function MiniPill({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.13em] text-primary">
+      {children}
+    </span>
+  );
+}
+
+function OverviewShell({ children }: { children: ReactNode }) {
+  return (
+    <section className="rounded-card border border-white/[0.055] bg-panel/[0.72] p-4 shadow-soft md:p-[18px]">
+      {children}
+    </section>
   );
 }
 
@@ -1065,146 +1150,145 @@ export function AppHomePage() {
   };
 
   const tabButtonClass = (tab: TabKey) =>
-    `inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 rounded-card px-3.5 text-sm font-bold transition ${
+    `inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 rounded-card px-3.5 text-[13px] font-semibold transition duration-200 ${
       activeTab === tab
-        ? "bg-primary text-white shadow-soft"
-        : "border border-line/70 bg-panel/65 text-subtext backdrop-blur-xl hover:border-primary/40 hover:bg-panelAlt/85 hover:text-text"
+        ? "bg-primary/[0.14] text-text"
+        : "text-subtext hover:bg-white/[0.04] hover:text-text"
     }`;
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-[1180px] px-4 py-5 md:px-5">
-      <header className="relative z-40 mb-3 overflow-visible isolate rounded-card border border-white/10 bg-panel/80 p-2.5 shadow-soft backdrop-blur-xl md:p-3">
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr),600px] xl:items-center">
-          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="inline-flex shrink-0 items-center rounded-[18px] border border-[#4d2132] bg-[#1b1017]/88 px-2.5 py-2 shadow-soft backdrop-blur-xl">
-              <AppBrand compact logoClassName="h-10 w-10" />
-            </div>
-
-            <div className="min-w-0">
-              <p className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.22em] text-primary">
-                <Sparkles size={12} />
-                VELA AI dashboard
-              </p>
-              <h1 className="mt-1 text-2xl font-extrabold leading-tight text-text">Xin chào {user?.name}</h1>
-              <p className="mt-0.5 max-w-[520px] truncate text-xs leading-5 text-subtext">
-                Xem lead, tạo nội dung, theo dõi công việc và chuẩn bị đăng bài.
+    <div className="mx-auto min-h-screen w-full max-w-[1120px] px-4 py-4 md:px-5">
+      <header className="relative z-40 mb-3 isolate overflow-visible rounded-card border border-white/[0.055] bg-panel/[0.78] px-3.5 py-3 shadow-soft backdrop-blur-xl">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr),auto] lg:items-center">
+          <div className="flex min-w-0 items-center gap-3.5">
+            <AppBrand compact showTagline={false} logoClassName="h-9 w-9" />
+            <span className="hidden h-9 w-px bg-white/[0.07] sm:block" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-primary">Không gian làm việc</p>
+              <h1 className="mt-0.5 line-clamp-2 break-words text-[clamp(1.1rem,2vw,1.45rem)] font-extrabold leading-[1.2] text-text">
+                Xin chào, {user?.name}
+              </h1>
+              <p className="mt-1 hidden max-w-[420px] text-[11px] leading-4 text-subtext sm:line-clamp-2">
+                Quản lý khách hàng, nội dung và công việc trong ngày.
               </p>
             </div>
           </div>
 
-          <div className="rounded-card border border-line/70 bg-panelAlt/50 p-1.5 shadow-soft backdrop-blur-xl">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="w-[180px] shrink-0">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="truncate text-sm font-extrabold text-text">Gói {planLabel(user?.plan ?? "mien_phi")}</p>
-                  <Badge tone="success">
-                    Còn {quota.remaining}/{quota.limit}
-                  </Badge>
+          <div className="flex min-w-0 flex-wrap items-center gap-2 lg:justify-end">
+            <div className="min-w-[190px] flex-1 rounded-card bg-white/[0.025] px-3 py-2 lg:flex-none">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-subtext">Gói đang dùng</p>
+                  <p className="mt-0.5 truncate text-[13px] font-bold text-text">{planLabel(user?.plan ?? "mien_phi")}</p>
                 </div>
-                <progress
-                  className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full accent-primary"
-                  value={quota.used}
-                  max={quota.limit || 1}
-                  aria-label="Tỷ lệ sử dụng AI trong ngày"
-                />
-                <span className="sr-only">
-                  Đã dùng {quota.used}/{quota.limit} lượt hôm nay ({aiUsagePercent}%).
-                </span>
+                <Badge tone="success">
+                  {quota.remaining}/{quota.limit} lượt
+                </Badge>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-card border border-line bg-panel text-text transition hover:bg-panelAlt"
-                aria-label="Chuyển giao diện"
-              >
-                {theme === "dark" ? <SunMedium size={15} /> : <MoonStar size={15} />}
-              </button>
-
-              <Button onClick={() => handleOpenUpgrade()} className="!min-h-8 h-8 shrink-0 px-2 text-xs">
-                <Crown size={14} />
-                Nâng cấp
-              </Button>
-
-              <div className="relative z-50 shrink-0" ref={headerMenuRef}>
-                <Button
-                  variant="secondary"
-                  className="!min-h-8 h-8 px-2 text-xs"
-                  onClick={() => setShowHeaderMenu((prev) => !prev)}
-                >
-                  <PencilLine size={14} />
-                  Cài đặt
-                  <ChevronDown size={13} />
-                </Button>
-
-                {showHeaderMenu ? (
-                  <div className="absolute right-0 top-[calc(100%+8px)] z-[80] w-[220px] rounded-card border border-line bg-panel p-2 shadow-soft">
-                    {user?.role === "admin" ? (
-                      <button
-                        type="button"
-                        className="flex w-full items-center rounded-card px-3 py-2 text-left text-sm font-semibold text-text hover:bg-panelAlt"
-                        onClick={() => {
-                          setShowHeaderMenu(false);
-                          navigate("/admin");
-                        }}
-                      >
-                        Trang Admin
-                      </button>
-                    ) : null}
-
-                    <button
-                      type="button"
-                      className="flex w-full items-center rounded-card px-3 py-2 text-left text-sm font-semibold text-text hover:bg-panelAlt"
-                      onClick={() => {
-                        setShowHeaderMenu(false);
-                        Promise.all([refreshMe(), refreshAllData()]).catch(() => undefined);
-                      }}
-                    >
-                      Làm mới dữ liệu
-                    </button>
-
-                    <button
-                      type="button"
-                      className="flex w-full items-center rounded-card px-3 py-2 text-left text-sm font-semibold text-text hover:bg-panelAlt"
-                      onClick={() => {
-                        setShowHeaderMenu(false);
-                        setShowUpdateBox((prev) => !prev);
-                      }}
-                    >
-                      Cập nhật tài khoản
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-
-              <Button
-                variant="danger"
-                className="!min-h-8 h-8 shrink-0 px-2 text-xs"
-                onClick={() => {
-                  logout();
-                  navigate("/login", { replace: true });
-                }}
-              >
-                <LogOut size={14} />
-                <span>Thoát</span>
-              </Button>
+              <progress
+                className="mt-2 h-1 w-full overflow-hidden rounded-full accent-primary"
+                value={quota.used}
+                max={quota.limit || 1}
+                aria-label="Tỷ lệ sử dụng AI trong ngày"
+              />
             </div>
+
+            <span className="sr-only">
+              Đã dùng {quota.used}/{quota.limit} lượt hôm nay ({aiUsagePercent}%).
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-card bg-white/[0.035] text-subtext transition duration-200 hover:bg-white/[0.07] hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              aria-label="Chuyển giao diện"
+            >
+              {theme === "dark" ? <SunMedium size={15} /> : <MoonStar size={15} />}
+            </button>
+
+            <Button onClick={() => handleOpenUpgrade()} className="!min-h-9 px-3">
+              <Crown size={14} />
+              Nâng cấp
+            </Button>
+
+            <div className="relative z-50" ref={headerMenuRef}>
+              <Button
+                variant="secondary"
+                className="!min-h-9 px-3"
+                onClick={() => setShowHeaderMenu((prev) => !prev)}
+              >
+                <PencilLine size={14} />
+                <span>Cài đặt</span>
+                <ChevronDown size={13} />
+              </Button>
+
+              {showHeaderMenu ? (
+                <div className="absolute right-0 top-[calc(100%+8px)] z-[80] w-[210px] rounded-card border border-white/[0.07] bg-panel p-1.5 shadow-soft">
+                  {user?.role === "admin" ? (
+                    <button
+                      type="button"
+                      className="flex w-full cursor-pointer items-center rounded-card px-3 py-2 text-left text-[13px] font-semibold text-text transition duration-200 hover:bg-white/[0.05]"
+                      onClick={() => {
+                        setShowHeaderMenu(false);
+                        navigate("/admin");
+                      }}
+                    >
+                      Trang Admin
+                    </button>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    className="flex w-full cursor-pointer items-center rounded-card px-3 py-2 text-left text-[13px] font-semibold text-text transition duration-200 hover:bg-white/[0.05]"
+                    onClick={() => {
+                      setShowHeaderMenu(false);
+                      Promise.all([refreshMe(), refreshAllData()]).catch(() => undefined);
+                    }}
+                  >
+                    Làm mới dữ liệu
+                  </button>
+
+                  <button
+                    type="button"
+                    className="flex w-full cursor-pointer items-center rounded-card px-3 py-2 text-left text-[13px] font-semibold text-text transition duration-200 hover:bg-white/[0.05]"
+                    onClick={() => {
+                      setShowHeaderMenu(false);
+                      setShowUpdateBox((prev) => !prev);
+                    }}
+                  >
+                    Cập nhật tài khoản
+                  </button>
+                </div>
+              ) : null}
+            </div>
+
+            <Button
+              variant="danger"
+              className="!min-h-9 px-3"
+              onClick={() => {
+                logout();
+                navigate("/login", { replace: true });
+              }}
+            >
+              <LogOut size={14} />
+              <span>Thoát</span>
+            </Button>
           </div>
         </div>
       </header>
 
       {loading ? (
-        <div className="mb-4 rounded-card border border-line bg-panel px-3 py-2 text-sm font-semibold text-subtext">
+        <div className="mb-3 rounded-card border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-[13px] font-semibold text-subtext shadow-soft">
           Đang đồng bộ dữ liệu...
         </div>
       ) : null}
 
       {showUpdateBox ? (
-        <Card className="mb-4">
+        <Card className="mb-4 bg-panel/90">
           <form className="grid gap-3 md:grid-cols-2" onSubmit={handleUpdateProfile}>
             <div className="md:col-span-2">
               <h2 className="text-lg font-bold text-text">Cập nhật tài khoản ngay trong dashboard</h2>
-              <p className="text-sm text-subtext">Bạn có thể đổi tên hiển thị và đổi mật khẩu tại đây.</p>
+              <p className="text-sm leading-6 text-subtext">Bạn có thể đổi tên hiển thị và đổi mật khẩu ngay tại đây.</p>
             </div>
             <InputField label="Họ và tên mới" value={updateName} onChange={(event) => setUpdateName(event.target.value)} />
             <div className="hidden md:block" />
@@ -1241,7 +1325,10 @@ export function AppHomePage() {
         </Card>
       ) : null}
 
-      <div className="relative z-10 mb-4 flex flex-wrap gap-2 rounded-card border border-white/10 bg-panel/70 p-2 shadow-soft backdrop-blur-xl">
+      <nav
+        className="relative z-10 mb-4 flex gap-1 overflow-x-auto border-b border-white/[0.055] pb-2"
+        aria-label="Các khu vực trong dashboard"
+      >
         <button className={tabButtonClass("overview")} type="button" onClick={() => setActiveTab("overview")}>
           <LayoutDashboard size={16} />
           Tổng quan
@@ -1262,83 +1349,129 @@ export function AppHomePage() {
           <SendHorizontal size={16} />
           Đăng tự động
         </button>
-      </div>
+      </nav>
 
       {activeTab === "overview" ? (
-        <div className="grid gap-4">
-          <Card className="bg-panel/82">
-            <div className="grid gap-4 lg:grid-cols-[1fr,2fr] lg:items-center">
-              <PanelHeader
-                icon={<LayoutDashboard size={18} />}
-                title="Tổng quan hôm nay"
-                description="Nhìn nhanh tình hình khách, nội dung và công việc trong ngày."
-              />
-              <div className="grid gap-3 sm:grid-cols-3">
-                <SoftStat label="Lead đang mở" value={openCount} />
-                <SoftStat label="Đã chốt" value={wonCount} tone="text-success" />
-                <SoftStat label="Việc còn lại" value={unfinishedTaskCount} tone="text-warning" />
-              </div>
-            </div>
-          </Card>
-
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr),minmax(280px,0.75fr)]">
-            <Card className="bg-panel/82">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid gap-3">
+          <OverviewShell>
+            <div className="grid gap-4 xl:grid-cols-[minmax(210px,0.7fr),minmax(0,1.55fr)] xl:items-center">
+              <div className="space-y-2.5">
+                <MiniPill>Nhịp làm việc hôm nay</MiniPill>
                 <PanelHeader
-                  icon={<MessageSquareText size={18} />}
-                  title="Menu chào khách"
-                  description="Mẫu câu và thao tác nhanh để phản hồi khách mới trong vài giây."
-                  action={<Badge tone="success">Sẵn sàng</Badge>}
+                  icon={<LayoutDashboard size={18} />}
+                  title="Tổng quan hôm nay"
+                  description="Nhìn nhanh tình hình khách, nội dung và công việc trong ngày để biết spa đang cần ưu tiên điều gì."
                 />
               </div>
-              <p className="mt-4 rounded-card border border-line/70 bg-panelAlt/45 p-3 text-sm leading-6 text-subtext">
-                "Spa cảm ơn chị đã nhắn tin. Em gửi ngay gói phù hợp và lịch trong hôm nay để chị chọn nhanh ạ."
-              </p>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                <Button onClick={() => setActiveTab("content")} className="w-full">
-                  <Sparkles size={16} />
-                  Tạo nội dung
-                </Button>
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => copyText(contentResult.replyTemplate || "Mẫu phản hồi chưa có.")}
-                >
-                  <Copy size={16} />
-                  Sao chép
-                </Button>
-                <Button variant="secondary" className="w-full" onClick={() => setActiveTab("leads")}>
-                  Cập nhật lead
-                </Button>
-                <Button variant="secondary" className="w-full" onClick={() => setActiveTab("autopost")}>
-                  Đăng bài
-                </Button>
-              </div>
-            </Card>
 
-            <Card className="bg-panel/82">
-              <PanelHeader
-                icon={<Crown size={18} />}
-                title="Tài nguyên"
-                description={`Gói ${planLabel(user?.plan ?? "mien_phi")} còn ${quota.remaining} lượt tạo nội dung.`}
-              />
-              <div className="mt-4 grid gap-2">
-                <Button onClick={() => handleOpenUpgrade()} className="w-full">
-                  <Crown size={16} />
-                  Xem gói nâng cấp
-                </Button>
-                <Button variant="secondary" onClick={() => refreshAllData()} className="w-full">
-                  Làm mới dữ liệu
-                </Button>
+              <div className="grid gap-2 md:grid-cols-3">
+                <SoftStat
+                  label="Lead đang mở"
+                  value={openCount}
+                  note="Khách mới đang cần theo dõi thêm."
+                  icon={<UsersRound size={18} />}
+                />
+                <SoftStat
+                  label="Đã chốt"
+                  value={wonCount}
+                  tone="text-success"
+                  note="Lead đã chuyển thành khách hàng."
+                  icon={<CheckCircle2 size={18} />}
+                />
+                <SoftStat
+                  label="Việc còn lại"
+                  value={unfinishedTaskCount}
+                  tone="text-warning"
+                  note="Các việc cần xử lý trước khi hết ngày."
+                  icon={<ListChecks size={18} />}
+                />
               </div>
-            </Card>
+            </div>
+          </OverviewShell>
+
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.38fr),minmax(270px,0.62fr)]">
+            <OverviewShell>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-2.5">
+                  <MiniPill>Phản hồi thật nhanh</MiniPill>
+                  <PanelHeader
+                    icon={<MessageSquareText size={18} />}
+                    title="Menu chào khách"
+                    description="Mẫu câu và thao tác nhanh để phản hồi khách mới trong vài giây mà vẫn giữ cảm giác chuyên nghiệp."
+                  />
+                </div>
+                <Badge tone="success">Sẵn sàng</Badge>
+              </div>
+
+              <div className="mt-3.5 rounded-card bg-white/[0.025] px-3.5 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-subtext">Mẫu chào nhanh</p>
+                <p className="mt-2 text-[12px] leading-5 text-subtext">
+                  "Spa cảm ơn chị đã nhắn tin. Em gửi ngay gói phù hợp và lịch trong hôm nay để chị chọn nhanh ạ."
+                </p>
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <QuickAction
+                  icon={<Sparkles size={16} />}
+                  label="Tạo nội dung"
+                  hint="Mở khung viết bài để có mẫu mới ngay."
+                  accent
+                  onClick={() => setActiveTab("content")}
+                />
+                <QuickAction
+                  icon={<Copy size={16} />}
+                  label="Sao chép phản hồi"
+                  hint="Lấy ngay mẫu trả lời khách gần nhất."
+                  onClick={() => copyText(contentResult.replyTemplate || "Mẫu phản hồi chưa có.")}
+                />
+                <QuickAction
+                  icon={<UsersRound size={16} />}
+                  label="Cập nhật lead"
+                  hint="Chuyển sang danh sách khách để theo dõi."
+                  onClick={() => setActiveTab("leads")}
+                />
+                <QuickAction
+                  icon={<SendHorizontal size={16} />}
+                  label="Chuẩn bị đăng bài"
+                  hint="Mở mục đăng tự động để lên bài nhanh."
+                  onClick={() => setActiveTab("autopost")}
+                />
+              </div>
+            </OverviewShell>
+
+            <OverviewShell>
+              <div className="space-y-2.5">
+                <MiniPill>Tài nguyên hôm nay</MiniPill>
+                <PanelHeader
+                  icon={<Crown size={18} />}
+                  title="Tài nguyên"
+                  description={`Gói ${planLabel(user?.plan ?? "mien_phi")} còn ${quota.remaining} lượt tạo nội dung trong hôm nay.`}
+                />
+
+                <div className="grid gap-2">
+                  <ResourceRow label="Gói hiện tại" value={planLabel(user?.plan ?? "mien_phi")} />
+                  <ResourceRow label="Lượt còn lại" value={`${quota.remaining}/${quota.limit}`} />
+                  <ResourceRow label="Tiến độ sử dụng" value={`${aiUsagePercent}%`} />
+                </div>
+
+                <div className="grid gap-2">
+                  <Button onClick={() => handleOpenUpgrade()} className="w-full !min-h-10">
+                    <Crown size={16} />
+                    Xem gói nâng cấp
+                  </Button>
+                  <Button variant="secondary" onClick={() => refreshAllData()} className="w-full !min-h-10">
+                    Làm mới dữ liệu
+                  </Button>
+                </div>
+              </div>
+            </OverviewShell>
           </div>
         </div>
       ) : null}
 
       {activeTab === "content" ? (
         <div className="grid items-start gap-4 xl:grid-cols-[0.98fr,1.02fr]">
-          <Card className="bg-panel/86">
+          <Card className="bg-panel/[0.86]">
             <form className="grid gap-4" onSubmit={handleGenerateContent}>
               <PanelHeader
                 icon={<WandSparkles size={18} />}
@@ -1408,7 +1541,7 @@ export function AppHomePage() {
             </form>
           </Card>
 
-          <Card className="grid gap-3 bg-panel/86">
+          <Card className="grid gap-3 bg-panel/[0.86]">
             <PanelHeader
               icon={<FileText size={18} />}
               title="Bài gợi ý"
@@ -1509,7 +1642,7 @@ export function AppHomePage() {
 
       {activeTab === "leads" ? (
         <div className="grid items-start gap-4 xl:grid-cols-[0.9fr,1.1fr]">
-          <Card className="bg-panel/86">
+          <Card className="bg-panel/[0.86]">
             <form className="grid gap-4" onSubmit={handleCreateLead}>
               <PanelHeader
                 icon={<UserPlus size={18} />}
@@ -1541,7 +1674,7 @@ export function AppHomePage() {
             </form>
           </Card>
 
-          <Card className="grid gap-3 bg-panel/86">
+          <Card className="grid gap-3 bg-panel/[0.86]">
             <PanelHeader
               icon={<UsersRound size={18} />}
               title="Danh sách lead"
@@ -1601,7 +1734,7 @@ export function AppHomePage() {
 
       {activeTab === "tasks" ? (
         <div className="grid items-start gap-4 xl:grid-cols-[0.9fr,1.1fr]">
-          <Card className="bg-panel/86">
+          <Card className="bg-panel/[0.86]">
             <form className="grid gap-4" onSubmit={handleCreateTask}>
               <PanelHeader
                 icon={<ClipboardList size={18} />}
@@ -1637,7 +1770,7 @@ export function AppHomePage() {
             </form>
           </Card>
 
-          <Card className="grid gap-3 bg-panel/86">
+          <Card className="grid gap-3 bg-panel/[0.86]">
             <PanelHeader
               icon={<ListChecks size={18} />}
               title="Danh sách công việc"
@@ -1767,7 +1900,7 @@ export function AppHomePage() {
 
       {activeTab === "autopost" ? (
         <div className="grid items-start gap-4 xl:grid-cols-[0.98fr,1.02fr]">
-          <Card className="bg-panel/86">
+          <Card className="bg-panel/[0.86]">
             <form className="grid gap-4" onSubmit={handleAutoPostSubmit}>
               <PanelHeader
                 icon={<Megaphone size={18} />}
@@ -1961,7 +2094,7 @@ export function AppHomePage() {
             </form>
           </Card>
 
-          <Card className="grid gap-3 bg-panel/86">
+          <Card className="grid gap-3 bg-panel/[0.86]">
             <PanelHeader
               icon={<CircleDot size={18} />}
               title="Xem trước bài đăng"

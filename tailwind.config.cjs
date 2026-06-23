@@ -17,7 +17,7 @@ module.exports = {
         warning: "hsl(var(--color-warning) / <alpha-value>)"
       },
       boxShadow: {
-        soft: "0 18px 45px -28px rgba(36, 13, 28, 0.58)"
+        soft: "0 22px 50px -30px rgba(20, 8, 18, 0.42), 0 10px 24px -18px rgba(216, 108, 146, 0.16)"
       },
       borderRadius: {
         card: "8px"

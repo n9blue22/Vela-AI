@@ -34,19 +34,24 @@ export function AppBrand({
   }
 
   return (
-    <div className={cn("inline-flex items-center gap-3", className)}>
-      <BrandMark className={cn(compact ? "h-11 w-11" : "h-14 w-14", logoClassName)} />
+    <div className={cn("inline-flex items-center gap-2", className)}>
+      <BrandMark className={cn(compact ? "h-10 w-10" : "h-14 w-14", logoClassName)} />
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <span className={cn("font-serif text-3xl font-semibold uppercase tracking-[0.2em] text-[#e7bfd0]", compact && "text-2xl")}>
+          <span className={cn("font-serif text-3xl font-semibold uppercase tracking-[0.2em] text-[#e7bfd0]", compact && "text-[1.55rem] tracking-[0.14em]")}>
             VELA
           </span>
-          <span className={cn("rounded-full border border-[#c94d73] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.34em] text-[#de6b91]", compact && "text-[10px]")}>
+          <span
+            className={cn(
+              "rounded-full border border-[#c94d73] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.34em] text-[#de6b91]",
+              compact && "px-1.5 py-0.5 text-[8px] tracking-[0.22em]"
+            )}
+          >
             AI
           </span>
         </div>
         {showTagline ? (
-          <p className={cn("mt-1 text-[11px] font-medium uppercase tracking-[0.34em] text-subtext", compact && "text-[10px] tracking-[0.28em]")}>
+          <p className={cn("mt-1 text-[11px] font-medium uppercase tracking-[0.34em] text-subtext", compact && "text-[9px] tracking-[0.24em]")}>
             Spa Marketing
           </p>
         ) : null}
@@ -54,4 +59,3 @@ export function AppBrand({
     </div>
   );
 }
-

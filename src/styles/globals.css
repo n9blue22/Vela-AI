@@ -20,11 +20,11 @@
 
 :root[data-theme="dark"] {
   --color-bg: 326 20% 9%;
-  --color-panel: 328 17% 14%;
-  --color-panel-alt: 325 14% 18%;
-  --color-line: 325 11% 31%;
+  --color-panel: 326 18% 15%;
+  --color-panel-alt: 325 15% 19%;
+  --color-line: 326 13% 27%;
   --color-text: 330 24% 94%;
-  --color-subtext: 326 11% 70%;
+  --color-subtext: 327 14% 73%;
   --color-primary: 344 72% 65%;
   --color-primary-strong: 344 64% 55%;
   --color-success: 151 48% 50%;
@@ -50,10 +50,9 @@ body {
 }
 
 :root[data-theme="dark"] body {
-  background: radial-gradient(circle at 8% 0%, hsl(342 49% 22% / 0.9), transparent 34%),
-    radial-gradient(circle at 88% 16%, hsl(154 45% 18% / 0.75), transparent 30%),
-    radial-gradient(circle at 100% 100%, hsl(31 56% 20% / 0.72), transparent 28%),
-    hsl(var(--color-bg));
+  background: radial-gradient(circle at 0% 0%, hsl(342 34% 19% / 0.42), transparent 34%),
+    radial-gradient(circle at 100% 8%, hsl(176 24% 14% / 0.28), transparent 31%),
+    linear-gradient(180deg, hsl(326 20% 9%), hsl(326 18% 8%));
 }
 
 #root {
