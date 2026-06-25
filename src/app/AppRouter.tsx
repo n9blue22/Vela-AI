@@ -16,7 +16,10 @@ const ResetPasswordPage = lazy(() =>
 );
 
 function PublicOnlyRoute({ children }: { children: ReactElement }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  if (loading) {
+    return <RouteLoadingFallback />;
+  }
   if (user) {
     return <Navigate to="/app" replace />;
   }

@@ -7,6 +7,19 @@ interface RequestConfig {
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5050/api").replace(/\/$/, "");
 const DEFAULT_TIMEOUT_MS = 15000;
+export const AUTH_EXPIRED_EVENT = "vela-auth-expired";
+
+export class ApiRequestError extends Error {
+  status: number;
+  data: unknown;
+
+  constructor(message: string, status: number, data: unknown) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.data = data;
+  }
+}
 
 function normalizePath(path: string): string {
   if (!path) return "/";
@@ -42,7 +55,10 @@ export async function apiRequest<T>(path: string, config: RequestConfig = {}): P
     }
     if (!response.ok) {
       const message = (data as { message?: string }).message || `API lỗi ${response.status}`;
-      throw new Error(message);
+      if (config.token && response.status === 401) {
+        window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+      }
+      throw new ApiRequestError(message, response.status, data);
     }
 
     return data as T;
