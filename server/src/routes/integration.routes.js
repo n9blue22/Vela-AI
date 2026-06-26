@@ -160,6 +160,25 @@ function buildPlatformFailure(platform, message, code = "") {
   };
 }
 
+function resolveIntegrationErrorStatus(error, fallbackStatus = 500) {
+  const status = Number(error?.status || 0);
+  if (error?.name === "IntegrationConfigurationError" || error?.code === "integration_not_configured") {
+    return 503;
+  }
+  if (status === 408 || status === 429 || status === 503) return status;
+  if (status >= 400 && status <= 599) return 502;
+  return fallbackStatus;
+}
+
+function sendIntegrationError(res, error, fallbackMessage, fallbackStatus = 500) {
+  const message = error instanceof Error ? error.message : fallbackMessage;
+  const code = String(error?.code || "").trim();
+  return res.status(resolveIntegrationErrorStatus(error, fallbackStatus)).json({
+    message,
+    ...(code ? { code } : {})
+  });
+}
+
 function applyScheduleJitter(scheduleAtIso, targetIndex, enabled) {
   if (!scheduleAtIso || !enabled) return scheduleAtIso;
   const jitterWindow = Math.max(0, Math.floor(Number(env.ZERNIO_SCHEDULE_JITTER_SECONDS || 0)));
@@ -267,8 +286,7 @@ router.post("/zernio/media/presign", requireAuth, autoPostLimiter, jsonParser, a
 
     return res.json({ items });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Khong tao duoc link tai tep len Zernio.";
-    return res.status(500).json({ message });
+    return sendIntegrationError(res, error, "Không tạo được link tải tệp lên dịch vụ đăng tự động.");
   }
 });
 
@@ -318,8 +336,7 @@ router.post("/zernio/connect-url", requireAuth, autoPostLimiter, jsonParser, asy
     });
   } catch (error) {
     console.error("[integrations] create zernio connect url failed", error);
-    const message = error instanceof Error ? error.message : "Khong tao duoc link ket noi mang xa hoi.";
-    return res.status(500).json({ message });
+    return sendIntegrationError(res, error, "Không tạo được link kết nối mạng xã hội.");
   }
 });
 
@@ -368,8 +385,7 @@ router.post("/zernio/connect/complete", requireAuth, autoPostLimiter, jsonParser
     });
   } catch (error) {
     console.error("[integrations] complete zernio connect failed", error);
-    const message = error instanceof Error ? error.message : "Khong the luu tai khoan mang xa hoi.";
-    return res.status(500).json({ message });
+    return sendIntegrationError(res, error, "Không thể lưu tài khoản mạng xã hội.");
   }
 });
 
@@ -495,8 +511,7 @@ router.post("/zernio/publish", requireAuth, autoPostLimiter, jsonParser, async (
       results: [...successResults, ...failedResults]
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Khong the dang bai tu dong luc nay.";
-    return res.status(500).json({ message });
+    return sendIntegrationError(res, error, "Không thể đăng bài tự động lúc này.");
   }
 });
 

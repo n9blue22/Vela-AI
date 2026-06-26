@@ -1084,7 +1084,7 @@ export function AppHomePage() {
       setAutoPostLastResult(publishResult);
       if (publishResult.status === "partial") {
         notify(
-          `Da gui ${publishResult.publishedCount} nen tang, ${publishResult.failedCount} nen tang gap loi.`,
+          `Đã gửi ${publishResult.publishedCount} nền tảng, ${publishResult.failedCount} nền tảng gặp lỗi.`,
           "info"
         );
       } else {
@@ -1092,7 +1092,7 @@ export function AppHomePage() {
       }
     } catch (error) {
       console.error("[autopost] submit live failed", error);
-      const message = error instanceof Error ? error.message : "Khong the xu ly dang tu dong luc nay.";
+      const message = error instanceof Error ? error.message : "Không thể xử lý đăng tự động lúc này.";
       notify(message, "error");
     } finally {
       setAutoPostSubmitting(false);

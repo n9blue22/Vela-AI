@@ -17,6 +17,15 @@ const SUPPORTED_MEDIA_TYPES = new Set([
 ]);
 const accountIdCache = new Map();
 
+export class IntegrationConfigurationError extends Error {
+  constructor(message = "Tính năng đăng tự động chưa sẵn sàng. Vui lòng liên hệ quản trị viên để kích hoạt kết nối.") {
+    super(message);
+    this.name = "IntegrationConfigurationError";
+    this.status = 503;
+    this.code = "integration_not_configured";
+  }
+}
+
 function normalizeBaseUrl() {
   const raw = String(env.ZERNIO_API_BASE_URL || "").trim().replace(/\/+$/, "");
   if (!raw) return "https://zernio.com/api/v1";
@@ -34,12 +43,12 @@ function buildUrl(pathname) {
 function getFriendlyZernioErrorMessage(status, payload) {
   const serverMessage = String(payload?.error || payload?.message || "").trim();
   if (serverMessage) return serverMessage;
-  if (status === 401) return "Zernio API key khong hop le hoac da het han.";
-  if (status === 402) return "Tai khoan Zernio can nang cap billing de tiep tuc.";
-  if (status === 404) return "Khong tim thay API path tren Zernio. Hay kiem tra ZERNIO_API_BASE_URL.";
-  if (status === 409) return "Noi dung nay da tung dang gan day. Hay doi caption hoac media de dang lai.";
-  if (status === 429) return "Zernio dang gioi han toc do. Vui long doi it phut va thu lai.";
-  return `Zernio API loi ${status}.`;
+  if (status === 401) return "Kết nối đăng tự động không hợp lệ hoặc đã hết hạn. Vui lòng kiểm tra lại cấu hình.";
+  if (status === 402) return "Tài khoản đăng tự động cần nâng cấp billing để tiếp tục.";
+  if (status === 404) return "Dịch vụ đăng tự động chưa nhận đúng đường dẫn API. Vui lòng kiểm tra cấu hình backend.";
+  if (status === 409) return "Nội dung này đã từng đăng gần đây. Hãy đổi caption hoặc media để đăng lại.";
+  if (status === 429) return "Dịch vụ đăng tự động đang giới hạn tốc độ. Vui lòng đợi ít phút rồi thử lại.";
+  return `Dịch vụ đăng tự động lỗi ${status}.`;
 }
 
 async function readResponseBody(response) {
@@ -76,7 +85,7 @@ function makeZernioError(response, payload) {
 
 function assertApiKey() {
   if (!String(env.ZERNIO_API_KEY || "").trim()) {
-    throw new Error("Ban chua cau hinh ZERNIO_API_KEY trong file .env.");
+    throw new IntegrationConfigurationError();
   }
 }
 
@@ -134,10 +143,10 @@ export async function requestZernio(pathname, { method = "GET", body, requestId 
     } catch (error) {
       let normalizedError = error;
       if (error instanceof DOMException && error.name === "AbortError") {
-        normalizedError = new Error("Zernio phan hoi qua cham. Vui long thu lai sau.");
+        normalizedError = new Error("Dịch vụ đăng tự động phản hồi quá chậm. Vui lòng thử lại sau.");
         normalizedError.status = 408;
       } else if (error instanceof TypeError && String(error.message).toLowerCase().includes("fetch")) {
-        normalizedError = new Error("Khong ket noi duoc toi Zernio API. Hay kiem tra internet va ZERNIO_API_BASE_URL.");
+        normalizedError = new Error("Không kết nối được tới dịch vụ đăng tự động. Vui lòng kiểm tra backend.");
         normalizedError.status = 503;
       }
 
@@ -152,7 +161,7 @@ export async function requestZernio(pathname, { method = "GET", body, requestId 
     }
   }
 
-  throw lastError || new Error("Zernio API loi khong xac dinh.");
+  throw lastError || new Error("Dịch vụ đăng tự động lỗi không xác định.");
 }
 
 function pickAccountId(row) {
@@ -194,8 +203,8 @@ function normalizeAccountRow(row) {
 }
 
 export async function createProfileForUser({ name, email, userId }) {
-  const cleanName = String(name || email || "Khach hang").trim().slice(0, 80);
-  const profileName = cleanName || `Khach hang ${String(userId || "").slice(0, 8)}`;
+  const cleanName = String(name || email || "Khách hàng").trim().slice(0, 80);
+  const profileName = cleanName || `Khách hàng ${String(userId || "").slice(0, 8)}`;
   const created = await requestZernio("/profiles", {
     method: "POST",
     body: {
@@ -207,7 +216,7 @@ export async function createProfileForUser({ name, email, userId }) {
   const profile = pickProfileFromPayload(created);
   const profileId = String(profile?._id || profile?.id || profile?.profileId || "").trim();
   if (!profileId) {
-    throw new Error("Zernio khong tra ve ma ho so ket noi. Vui long thu lai.");
+    throw new Error("Dịch vụ đăng tự động chưa trả về mã hồ sơ kết nối. Vui lòng thử lại.");
   }
   return {
     providerProfileId: profileId,
@@ -219,7 +228,7 @@ export async function getConnectUrl({ platform, profileId, redirectUrl }) {
   const platformKey = String(platform || "").trim().toLowerCase();
   const safeProfileId = String(profileId || "").trim();
   if (!platformKey || !safeProfileId) {
-    throw new Error("Thieu thong tin ket noi mang xa hoi.");
+    throw new Error("Thiếu thông tin kết nối mạng xã hội.");
   }
 
   const query = new URLSearchParams({
@@ -232,7 +241,7 @@ export async function getConnectUrl({ platform, profileId, redirectUrl }) {
   const result = await requestZernio(`/connect/${encodeURIComponent(platformKey)}?${query.toString()}`);
   const authUrl = String(result?.authUrl || result?.connectUrl || result?.redirectUrl || result?.url || "").trim();
   if (!authUrl) {
-    throw new Error("Zernio khong tra ve link ket noi. Vui long thu lai.");
+    throw new Error("Dịch vụ đăng tự động chưa trả về link kết nối. Vui lòng thử lại.");
   }
   return {
     authUrl,
